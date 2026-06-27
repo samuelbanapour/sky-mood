@@ -55,13 +55,22 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Select latest stable Xcode
-        # The GA maui-ios/maccatalyst workload pins an exact Xcode version. 'latest-stable' selects
-        # the newest released Xcode (excluding betas/RCs), which matches the GA workload — the
-        # runner's default is often older and a raw "newest" can grab a too-new RC.
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
+      - name: Select the Xcode the iOS workload requires
+        # The GA maui-ios/maccatalyst workload pins an EXACT Xcode (currently 26.5). The runner
+        # carries several side by side (e.g. 26.3, 26.5, 26.6-RC), and neither the default nor
+        # "latest-stable" lands on it — so pick Xcode_26.5 explicitly, falling back to the newest
+        # non-prerelease if that name ever changes. Bump XCODE_MATCH when the workload bumps Xcode.
+        env:
+          XCODE_MATCH: '26.5'
+        run: |
+          target=$(ls -d /Applications/Xcode_${XCODE_MATCH}*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$target" ]; then
+            echo "Xcode ${XCODE_MATCH} not found. Available:"; ls -d /Applications/Xcode_*.app || true
+            target=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|candidate|_rc' | sort -V | tail -1)
+          fi
+          echo "Selecting $target"
+          sudo xcode-select -s "$target/Contents/Developer"
+          xcodebuild -version
       - name: Install MAUI Apple workloads
         run: dotnet workload install maui-ios maui-maccatalyst
       - name: Build iOS (simulator, no code signing)
