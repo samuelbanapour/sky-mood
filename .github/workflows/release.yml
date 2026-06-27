@@ -80,7 +80,7 @@ jobs:
 
       - name: Build AAB
         run: |
-          common=(-c Release -f net10.0-android -p:AndroidPackageFormat=aab
+          common=(-c Release -p:Heads=android -p:AndroidPackageFormat=aab
                   -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
                   -p:ApplicationVersion=${{ needs.version.outputs.build }})
           if [ "${{ steps.ks.outputs.signed }}" = "true" ]; then
@@ -163,7 +163,7 @@ jobs:
       - name: Build .ipa (signed) or compile-check (unsigned)
         run: |
           if [ "${{ steps.sign.outputs.signed }}" = "true" ]; then
-            dotnet publish "$APP" -c Release -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
+            dotnet publish "$APP" -c Release -p:Heads=ios -p:RuntimeIdentifier=ios-arm64 \
               -p:ArchiveOnBuild=true -p:BuildIpa=true \
               -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }} \
               -p:ApplicationVersion=${{ needs.version.outputs.build }} \
@@ -172,7 +172,7 @@ jobs:
             mkdir -p out; find "$HOME/.skymood-build" -name "*.ipa" -exec cp {} out/ \;
             ls -la out
           else
-            dotnet build "$APP" -c Release -f net10.0-ios -p:RuntimeIdentifier=iossimulator-arm64
+            dotnet build "$APP" -c Release -p:Heads=ios -p:RuntimeIdentifier=iossimulator-arm64
           fi
 
       - name: Upload .ipa artifact
@@ -204,7 +204,7 @@ jobs:
 
       - name: Build MSIX
         run: |
-          common=(-c Release -f net10.0-windows10.0.19041.0
+          common=(-c Release -p:Heads=windows
                   -p:RuntimeIdentifierOverride=win10-x64
                   -p:GenerateAppxPackageOnBuild=true
                   -p:AppxPackageDir=msix/
