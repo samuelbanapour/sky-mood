@@ -121,6 +121,7 @@ jobs:
         run: dotnet build $env:APP -c $env:BUILD_CONFIG -p:Heads=windows -p:WindowsPackageType=None
       - uses: actions/upload-artifact@v4
         with:
+          # Whole output folder (exe + its DLLs/runtime), so the artifact is actually runnable.
           name: skymood-windows
-          path: '**/bin/${{ env.BUILD_CONFIG }}/net10.0-windows*/**/SkyMood.App.exe'
+          path: SkyMood.App/bin/${{ env.BUILD_CONFIG }}/net10.0-windows*/**
           if-no-files-found: warn
