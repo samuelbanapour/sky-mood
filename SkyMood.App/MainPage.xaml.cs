@@ -45,6 +45,9 @@ public partial class MainPage : ContentPage
         UnitBtn.Clicked += (_, _) => ToggleUnit();
         ResultsList.SelectionChanged += OnResultSelected;
         PlacesList.SelectionChanged += OnPlaceSelected;
+
+        AddTapBurst(EmojiLabel);   // tap the emoji or temperature for a confetti burst
+        AddTapBurst(TempLabel);
     }
 
     protected override async void OnAppearing()
@@ -80,6 +83,7 @@ public partial class MainPage : ContentPage
         _animTimer.Tick += (_, _) =>
         {
             _scene.Time += 0.033f;
+            _scene.StepParticles(0.033f);
 
             // Random lightning during storms.
             if (_scene.Kind == WeatherKind.Storm)
@@ -123,6 +127,7 @@ public partial class MainPage : ContentPage
         EmojiLabel.Text = v.Emoji;
         TempLabel.Text = Temp(r.Reading.TempC);
         DescLabel.Text = r.Reading.IsDay ? v.Label : $"{v.Label} · night";
+        QuipLabel.Text = QuipFor(v.Kind, r.Reading.TempC, r.Reading.IsDay);
         PlaceLabel.Text = $"{r.Location.Display}  ·  {r.Reading.ObservedAt.ToLocalTime():t}";
         FeelsLabel.Text = Temp(r.Reading.FeelsLikeC);
         HumidityLabel.Text = $"{r.Reading.Humidity}%";
@@ -135,6 +140,51 @@ public partial class MainPage : ContentPage
         _scene.IsDay = r.Reading.IsDay;
         _scene.RainIntensity = v.RainIntensity;
         _scene.SnowIntensity = v.SnowIntensity;
+        _scene.WindKph = r.Reading.WindKph;
+    }
+
+    // ---------------- playful extras ----------------
+
+    void AddTapBurst(View target)
+    {
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += (_, e) =>
+        {
+            if (e.GetPosition(SceneView) is Point pt) _scene.Spawn((float)pt.X, (float)pt.Y);
+            _ = Wiggle(target);
+        };
+        target.GestureRecognizers.Add(tap);
+    }
+
+    static async Task Wiggle(View v)
+    {
+        await v.ScaleToAsync(1.18, 90, Easing.CubicOut);
+        await v.RotateToAsync(-10, 60);
+        await v.RotateToAsync(8, 60);
+        await v.RotateToAsync(0, 60);
+        await v.ScaleToAsync(1.0, 90, Easing.CubicIn);
+    }
+
+    static readonly string[] _quipClearDay = { "Perfect day to be outside ☀️", "Grab your shades 😎", "Not a cloud in sight!", "Vitamin-D o'clock 🌻" };
+    static readonly string[] _quipClearNight = { "Clear skies, sweet dreams 🌙", "Stargazing weather ✨", "Calm & clear tonight" };
+    readonly Random _quipRnd = new();
+
+    string QuipFor(WeatherKind kind, double tempC, bool day)
+    {
+        string[] pool = kind switch
+        {
+            WeatherKind.Clear     => day ? _quipClearDay : _quipClearNight,
+            WeatherKind.FewClouds => new[] { "Sun's playing peek-a-boo ⛅", "A few clouds just visiting ☁️", "Gentle skies today" },
+            WeatherKind.Cloudy    => new[] { "A cosy, cloudy one ☁️", "Soft grey skies", "Cloud-blanket mode: on" },
+            WeatherKind.Fog       => new[] { "Mysterious out there… 🌫️", "Mind the fog!", "Everything's a bit dreamy" },
+            WeatherKind.Rain      => new[] { "Umbrella weather ☂️", "Liquid sunshine 🌧️", "Puddle-jumping time!", "Don't forget your brolly" },
+            WeatherKind.Snow      => new[] { "Snowball ammo incoming ❄️", "Hot cocoa highly advised ☕", "Let it snow! ⛄", "Bundle up, buttercup" },
+            WeatherKind.Storm     => new[] { "Whoa — thunderstorm! ⛈️", "Nature's light show ⚡", "Cosy-up-inside weather" },
+            _                     => new[] { "Whatever the weather 🌡️" },
+        };
+        if (tempC <= 0) pool = pool.Append("Brrr… freezing! 🥶").ToArray();
+        else if (tempC >= 32) pool = pool.Append("Scorcher alert! 🥵").ToArray();
+        return pool[_quipRnd.Next(pool.Length)];
     }
 
     void SetBadge(DataChannel channel, string note)

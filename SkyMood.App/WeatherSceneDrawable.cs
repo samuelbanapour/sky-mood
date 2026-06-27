@@ -5,7 +5,9 @@ namespace SkyMood.App;
 /// <summary>
 /// Draws the animated sky behind the readout: a gradient background plus a pulsing sun (or moon and
 /// twinkling stars at night), drifting clouds, falling rain, swaying snow, rolling fog and lightning
-/// flashes — chosen to match the current <see cref="WeatherKind"/>. The owning page advances
+/// flashes — chosen to match the current <see cref="WeatherKind"/>. Playful extras mirror the web
+/// edition: birds on sunny days, shooting stars at night, a daytime rainbow when it rains, a kite
+/// when it's breezy, wind-reactive cloud speed, and tap-to-burst confetti. The owning page advances
 /// <see cref="Time"/> on a timer and calls Invalidate() to animate.
 /// </summary>
 public sealed class WeatherSceneDrawable : IDrawable
@@ -16,11 +18,24 @@ public sealed class WeatherSceneDrawable : IDrawable
     public float Flash { get; set; }          // 0..1 lightning overlay
     public int RainIntensity { get; set; }    // ~0..140, from the weather code
     public int SnowIntensity { get; set; }    // ~0..100
+    public double WindKph { get; set; }        // drives cloud/bird drift speed + the kite
+
+    float WindFactor => 1f + (float)WindKph / 40f;
 
     readonly (float x, float y, float size, float phase)[] _stars;
     readonly (float x, float y, float scale, float speed, float seed)[] _clouds;
     readonly (float x, float len, float speed, float phase)[] _rain;
     readonly (float x, float y, float r, float speed, float sway, float phase)[] _snow;
+    readonly (float y, float speed, float phase)[] _birds;
+    readonly (float x, float y, float speed, float phase)[] _shoot;
+    readonly List<Particle> _particles = new();
+    readonly Random _r = new();
+
+    static readonly Color[] Confetti =
+    {
+        Color.FromArgb("#FF5E5E"), Color.FromArgb("#FFB14E"), Color.FromArgb("#FFE14E"),
+        Color.FromArgb("#74E07D"), Color.FromArgb("#5EC8FF"), Color.FromArgb("#9A7DFF"), Color.FromArgb("#FF8FD0"),
+    };
 
     public WeatherSceneDrawable()
     {
@@ -42,6 +57,44 @@ public sealed class WeatherSceneDrawable : IDrawable
         _snow = new (float, float, float, float, float, float)[120];
         for (int i = 0; i < _snow.Length; i++)
             _snow[i] = (F(), F(), 1.6f + F() * 3.4f, 0.04f + F() * 0.07f, 0.01f + F() * 0.03f, F() * 6.28f);
+
+        _birds = new (float, float, float)[4];
+        for (int i = 0; i < _birds.Length; i++)
+            _birds[i] = (0.12f + F() * 0.3f, 0.006f + F() * 0.01f, F());
+
+        _shoot = new (float, float, float, float)[3];
+        for (int i = 0; i < _shoot.Length; i++)
+            _shoot[i] = (F() * 0.6f, F() * 0.3f, 0.05f + F() * 0.06f, F());
+    }
+
+    // ---------------- tap-burst confetti ----------------
+
+    /// <summary>Spawn a confetti burst at a point (page coordinates). Stepped by the page timer.</summary>
+    public void Spawn(float x, float y)
+    {
+        for (int i = 0; i < 20; i++)
+        {
+            float a = (float)(_r.NextDouble() * Math.PI * 2);
+            float sp = 120 + (float)_r.NextDouble() * 260;
+            _particles.Add(new Particle
+            {
+                X = x, Y = y,
+                VX = MathF.Cos(a) * sp, VY = MathF.Sin(a) * sp - 130,
+                Life = 0.9f + (float)_r.NextDouble() * 0.5f, Max = 1.4f,
+                Size = 4 + (float)_r.NextDouble() * 5, C = Confetti[_r.Next(Confetti.Length)],
+            });
+        }
+    }
+
+    public void StepParticles(float dt)
+    {
+        for (int i = _particles.Count - 1; i >= 0; i--)
+        {
+            var p = _particles[i];
+            p.VY += 520 * dt; p.VX *= 0.99f;
+            p.X += p.VX * dt; p.Y += p.VY * dt; p.Life -= dt;
+            if (p.Life <= 0) _particles.RemoveAt(i);
+        }
     }
 
     public void Draw(ICanvas canvas, RectF rect)
@@ -52,11 +105,12 @@ public sealed class WeatherSceneDrawable : IDrawable
         DrawSky(canvas, rect);
 
         bool clearish = Kind is WeatherKind.Clear or WeatherKind.FewClouds;
-        if (IsDay && clearish) DrawSun(canvas, w, h);
+        if (IsDay && clearish) { DrawSun(canvas, w, h); DrawBirds(canvas, w, h); }
         if (!IsDay)
         {
             if (clearish) DrawMoon(canvas, w, h);
             DrawStars(canvas, w, h, Kind == WeatherKind.Clear ? 80 : 34);
+            if (Kind == WeatherKind.Clear) DrawShootingStars(canvas, w, h);
         }
 
         int cloudCount = Kind switch
@@ -72,11 +126,17 @@ public sealed class WeatherSceneDrawable : IDrawable
         if (SnowIntensity > 0) DrawSnow(canvas, w, h, Math.Min(_snow.Length, SnowIntensity));
         if (Kind == WeatherKind.Fog) DrawFog(canvas, w, h);
 
+        if (IsDay && Kind == WeatherKind.Rain) DrawRainbow(canvas, w, h);          // cheery arc in daylight rain
+        if (IsDay && WindKph >= 22 && Kind is not WeatherKind.Storm and not WeatherKind.Fog)
+            DrawKite(canvas, w, h);                                                 // a kite when it's breezy
+
         if (Flash > 0.001f)
         {
             canvas.FillColor = Color.FromRgba(255, 255, 255, (int)(Flash * 170));
             canvas.FillRectangle(rect);
         }
+
+        DrawParticles(canvas);                                                      // confetti on top of everything
     }
 
     // ---------------- sky ----------------
@@ -88,11 +148,7 @@ public sealed class WeatherSceneDrawable : IDrawable
         {
             StartPoint = new Point(0, 0),
             EndPoint = new Point(0, 1),
-            GradientStops = new[]
-            {
-                new PaintGradientStop(0f, top),
-                new PaintGradientStop(1f, bottom),
-            },
+            GradientStops = new[] { new PaintGradientStop(0f, top), new PaintGradientStop(1f, bottom) },
         };
         canvas.SetFillPaint(paint, rect);
         canvas.FillRectangle(rect);
@@ -134,7 +190,7 @@ public sealed class WeatherSceneDrawable : IDrawable
         Circle(canvas, cx, cy, r * 1.5f);
         canvas.FillColor = Hex("#EEF1F8");
         Circle(canvas, cx, cy, r);
-        canvas.FillColor = Hex("#AEB6C9");           // crescent shadow
+        canvas.FillColor = Hex("#AEB6C9");
         Circle(canvas, cx + r * 0.5f, cy - r * 0.25f, r * 0.85f);
     }
 
@@ -150,6 +206,43 @@ public sealed class WeatherSceneDrawable : IDrawable
         }
     }
 
+    void DrawBirds(ICanvas canvas, float w, float h)
+    {
+        canvas.StrokeColor = Color.FromRgba(40, 46, 60, 170);
+        canvas.StrokeSize = 2.2f;
+        float s = MathF.Max(5f, w * 0.013f);
+        for (int i = 0; i < _birds.Length; i++)
+        {
+            var b = _birds[i];
+            float x = (Frac(b.phase + Time * b.speed * WindFactor) * 1.2f - 0.1f) * w;
+            float y = b.y * h + MathF.Sin(Time * 2f + b.phase * 6f) * 4f;
+            var p = new PathF();
+            p.MoveTo(x - 2 * s, y);
+            p.QuadTo(x - s, y - 1.2f * s, x, y);
+            p.QuadTo(x + s, y - 1.2f * s, x + 2 * s, y);
+            canvas.DrawPath(p);
+        }
+    }
+
+    void DrawShootingStars(ICanvas canvas, float w, float h)
+    {
+        for (int i = 0; i < _shoot.Length; i++)
+        {
+            var s = _shoot[i];
+            float prog = Frac(Time * s.speed + s.phase);
+            if (prog > 0.18f) continue;                 // brief streak, long gap
+            float t = prog / 0.18f, fade = 1f - t;
+            float sx = s.x * w + t * w * 0.28f;
+            float sy = s.y * h + t * h * 0.2f;
+            float len = w * 0.06f;
+            canvas.StrokeSize = 2.4f;
+            canvas.StrokeColor = Color.FromRgba(1f, 1f, 1f, fade);
+            canvas.DrawLine(sx, sy, sx - len, sy - len * 0.7f);
+            canvas.FillColor = Color.FromRgba(1f, 1f, 1f, fade);
+            Circle(canvas, sx, sy, 2.2f);
+        }
+    }
+
     // ---------------- clouds ----------------
 
     void DrawClouds(ICanvas canvas, float w, float h, int count)
@@ -160,7 +253,7 @@ public sealed class WeatherSceneDrawable : IDrawable
         for (int i = 0; i < count; i++)
         {
             var c = _clouds[i];
-            float x = (Frac(c.x + Time * c.speed) * 1.4f - 0.2f) * w;
+            float x = (Frac(c.x + Time * c.speed * WindFactor) * 1.4f - 0.2f) * w;
             float y = c.y * h;
             float cw = (90f + c.scale * 150f);
             DrawCloud(canvas, x, y, cw, col);
@@ -176,7 +269,7 @@ public sealed class WeatherSceneDrawable : IDrawable
         canvas.FillEllipse(x + cw * 0.42f, y - ch * 0.75f, cw * 0.52f, ch * 1.5f);
     }
 
-    // ---------------- precipitation ----------------
+    // ---------------- precipitation + extras ----------------
 
     void DrawRain(ICanvas canvas, float w, float h, int count)
     {
@@ -216,6 +309,48 @@ public sealed class WeatherSceneDrawable : IDrawable
         }
     }
 
+    void DrawRainbow(ICanvas canvas, float w, float h)
+    {
+        float cx = w * 0.5f, cy = h * 0.46f, r0 = MathF.Min(w, h) * 0.46f;
+        Color[] cols = { Hex("#FF5E5E"), Hex("#FFB14E"), Hex("#FFE14E"), Hex("#74E07D"), Hex("#5EC8FF"), Hex("#9A7DFF") };
+        canvas.StrokeSize = 6;
+        for (int i = 0; i < cols.Length; i++)
+        {
+            float r = r0 - i * 7;
+            canvas.StrokeColor = cols[i].WithAlpha(0.5f);
+            canvas.DrawArc(cx - r, cy - r, r * 2, r * 2, 0, 180, false, false); // top arch
+        }
+    }
+
+    void DrawKite(ICanvas canvas, float w, float h)
+    {
+        float sway = MathF.Sin(Time * 1.1f) * w * 0.04f;
+        float kx = w * 0.72f + sway, ky = h * 0.30f - MathF.Cos(Time * 1.1f) * h * 0.02f;
+        float s = MathF.Min(w, h) * 0.05f;
+
+        var p = new PathF();
+        p.MoveTo(kx, ky - s); p.LineTo(kx + s * 0.7f, ky); p.LineTo(kx, ky + s); p.LineTo(kx - s * 0.7f, ky); p.Close();
+        canvas.FillColor = Hex("#FF6FA5"); canvas.FillPath(p);
+        canvas.StrokeColor = Color.FromRgba(1f, 1f, 1f, 0.6f); canvas.StrokeSize = 1;
+        canvas.DrawLine(kx, ky - s, kx, ky + s); canvas.DrawLine(kx - s * 0.7f, ky, kx + s * 0.7f, ky);
+
+        canvas.StrokeColor = Hex("#FFD86B"); canvas.StrokeSize = 2;
+        var t = new PathF(); t.MoveTo(kx, ky + s);
+        for (int i = 1; i <= 5; i++)
+            t.LineTo(kx + MathF.Sin(Time * 3f + i) * s * 0.35f, ky + s + i * s * 0.5f);
+        canvas.DrawPath(t);
+    }
+
+    void DrawParticles(ICanvas canvas)
+    {
+        foreach (var p in _particles)
+        {
+            float al = Math.Clamp(p.Life / p.Max, 0f, 1f);
+            canvas.FillColor = p.C.WithAlpha(al);
+            Circle(canvas, p.X, p.Y, p.Size);
+        }
+    }
+
     // ---------------- helpers ----------------
 
     static void Circle(ICanvas canvas, float cx, float cy, float r)
@@ -223,4 +358,10 @@ public sealed class WeatherSceneDrawable : IDrawable
 
     static float Frac(float v) => v - MathF.Floor(v);
     static Color Hex(string hex) => Color.FromArgb(hex);
+
+    sealed class Particle
+    {
+        public float X, Y, VX, VY, Life, Max, Size;
+        public Color C = Colors.White;
+    }
 }

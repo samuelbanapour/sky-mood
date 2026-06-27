@@ -58,6 +58,8 @@
                        TextColor="{StaticResource Ink}" />
                 <Label x:Name="DescLabel" Text="" FontSize="22" HorizontalOptions="Center"
                        TextColor="{StaticResource Ink}" />
+                <Label x:Name="QuipLabel" Text="" FontSize="15" FontAttributes="Bold" HorizontalOptions="Center"
+                       TextColor="{StaticResource Ink}" Opacity="0.95" />
                 <Label x:Name="PlaceLabel" Text="" FontSize="15" HorizontalOptions="Center"
                        TextColor="{StaticResource InkSoft}" />
 
