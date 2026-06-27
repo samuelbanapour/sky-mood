@@ -180,8 +180,9 @@ jobs:
               -p:ApplicationVersion=${{ needs.version.outputs.build }} \
               -p:EnableCodeSigning=false -p:CodesignKey="" -p:_RequireCodeSigning=false
             mkdir -p out
-            app=$(find "$HOME/.skymood-build" -type d -path '*net10.0-ios*ios-arm64*/*.app' | head -1)
-            if [ -z "$app" ]; then echo "No device .app produced:"; find "$HOME/.skymood-build" -maxdepth 8 -name '*.app' -type d; exit 1; fi
+            # The real app bundle lives under bin/ — avoid the obj/.../strip intermediate (near-empty).
+            app=$(find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-ios/ios-arm64" -maxdepth 1 -type d -name '*.app' | head -1)
+            if [ -z "$app" ]; then echo "No device .app under bin/:"; find "$HOME/.skymood-build" -path '*bin*net10.0-ios*' -name '*.app' -type d; exit 1; fi
             echo "Packaging $app into an .ipa"
             rm -rf Payload && mkdir Payload && cp -R "$app" Payload/
             zip -qr "out/SkyMood-${{ needs.version.outputs.display }}-unsigned.ipa" Payload
