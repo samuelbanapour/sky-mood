@@ -1,0 +1,13 @@
+<Project>
+
+  <!-- Build output goes to the internal APFS disk. This repo lives on an exFAT volume that
+       creates macOS AppleDouble dot-underscore (._*) sidecar files; the Android/iOS toolchains
+       generate intermediates whose sidecars then break javac / codesign. APFS never creates them.
+       (Same approach as the Echoes solution next door.) macOS/Linux only; on Windows $(HOME) is
+       empty and there's no ._* issue. -->
+  <PropertyGroup Condition="!$([MSBuild]::IsOSPlatform('windows'))">
+    <BaseIntermediateOutputPath>$(HOME)/.skymood-build/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(HOME)/.skymood-build/$(MSBuildProjectName)/bin/</BaseOutputPath>
+  </PropertyGroup>
+
+</Project>

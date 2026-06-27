@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="456" height="456" viewBox="0 0 456 456" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- sun -->
+  <g stroke="#FFD86B" stroke-width="14" stroke-linecap="round">
+    <line x1="196" y1="120" x2="196" y2="86"/>
+    <line x1="142" y1="142" x2="118" y2="118"/>
+    <line x1="120" y1="196" x2="86" y2="196"/>
+    <line x1="250" y1="142" x2="274" y2="118"/>
+  </g>
+  <circle cx="196" cy="196" r="52" fill="#FFE16B"/>
+  <!-- cloud -->
+  <g fill="#EAF2FB">
+    <circle cx="222" cy="288" r="52"/>
+    <circle cx="286" cy="270" r="64"/>
+    <circle cx="330" cy="300" r="46"/>
+    <rect x="200" y="296" width="168" height="60" rx="30"/>
+  </g>
+</svg>

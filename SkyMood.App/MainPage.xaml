@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SkyMood.App.MainPage"
+             BackgroundColor="#0A1428">
+
+    <Grid>
+        <!-- Animated sky fills everything; the readout floats on top. -->
+        <GraphicsView x:Name="SceneView" />
+
+        <ScrollView>
+            <VerticalStackLayout Padding="18,16" Spacing="14">
+
+                <!-- Search row: look up any place, or jump back to my location -->
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Border Grid.Column="0" StrokeShape="RoundRectangle 22"
+                            Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}"
+                            Padding="14,0">
+                        <Entry x:Name="SearchEntry" Placeholder="Search a city…" ReturnType="Search"
+                               TextColor="{StaticResource Ink}" PlaceholderColor="#99CCD6E5"
+                               BackgroundColor="Transparent" />
+                    </Border>
+                    <Button Grid.Column="1" x:Name="SearchBtn" Text="Search" CornerRadius="22"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}" Padding="14,0" />
+                    <Button Grid.Column="2" x:Name="LocateBtn" Text="📍" CornerRadius="22"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}"
+                            WidthRequest="46" Padding="0" />
+                </Grid>
+
+                <!-- Search results (shown only when there are matches) -->
+                <Border x:Name="ResultsCard" IsVisible="False" StrokeShape="RoundRectangle 16"
+                        Stroke="{StaticResource GlassEdge}" BackgroundColor="#CC0E1A30" Padding="4">
+                    <CollectionView x:Name="ResultsList" SelectionMode="Single" HeightRequest="180">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="14,11">
+                                    <Label Text="{Binding Display}" TextColor="{StaticResource Ink}" FontSize="16" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Border>
+
+                <!-- Status badge + freshness note -->
+                <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,6,0,0">
+                    <Border x:Name="BadgeBorder" StrokeShape="RoundRectangle 10" StrokeThickness="0"
+                            BackgroundColor="#3FB36B" Padding="10,3">
+                        <Label x:Name="BadgeLabel" Text="LIVE" TextColor="#06210F" FontSize="11"
+                               FontAttributes="Bold" />
+                    </Border>
+                    <Label x:Name="NoteLabel" Text="" TextColor="{StaticResource InkSoft}" FontSize="13"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <!-- Hero readout -->
+                <Label x:Name="EmojiLabel" Text="☀️" FontSize="76" HorizontalOptions="Center" />
+                <Label x:Name="TempLabel" Text="—" FontSize="96" HorizontalOptions="Center"
+                       TextColor="{StaticResource Ink}" />
+                <Label x:Name="DescLabel" Text="" FontSize="22" HorizontalOptions="Center"
+                       TextColor="{StaticResource Ink}" />
+                <Label x:Name="PlaceLabel" Text="" FontSize="15" HorizontalOptions="Center"
+                       TextColor="{StaticResource InkSoft}" />
+
+                <!-- Stats tiles -->
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12"
+                      Margin="0,8,0,0">
+                    <Border Grid.Row="0" Grid.Column="0" StrokeShape="RoundRectangle 16"
+                            Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}" Padding="16,12">
+                        <VerticalStackLayout>
+                            <Label Text="FEELS LIKE" FontSize="11" TextColor="{StaticResource InkSoft}" />
+                            <Label x:Name="FeelsLabel" Text="—" FontSize="22" TextColor="{StaticResource Ink}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Row="0" Grid.Column="1" StrokeShape="RoundRectangle 16"
+                            Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}" Padding="16,12">
+                        <VerticalStackLayout>
+                            <Label Text="HUMIDITY" FontSize="11" TextColor="{StaticResource InkSoft}" />
+                            <Label x:Name="HumidityLabel" Text="—" FontSize="22" TextColor="{StaticResource Ink}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="0" StrokeShape="RoundRectangle 16"
+                            Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}" Padding="16,12">
+                        <VerticalStackLayout>
+                            <Label Text="WIND" FontSize="11" TextColor="{StaticResource InkSoft}" />
+                            <Label x:Name="WindLabel" Text="—" FontSize="22" TextColor="{StaticResource Ink}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="1" StrokeShape="RoundRectangle 16"
+                            Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}" Padding="16,12">
+                        <VerticalStackLayout>
+                            <Label Text="HIGH / LOW" FontSize="11" TextColor="{StaticResource InkSoft}" />
+                            <Label x:Name="HighLowLabel" Text="—" FontSize="22" TextColor="{StaticResource Ink}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Saved places (also your offline list) -->
+                <Label Text="SAVED PLACES" FontSize="11" TextColor="{StaticResource InkSoft}" Margin="2,10,0,0" />
+                <CollectionView x:Name="PlacesList" HeightRequest="62" SelectionMode="Single">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="10" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border StrokeShape="RoundRectangle 14" Stroke="{StaticResource GlassEdge}"
+                                    BackgroundColor="{StaticResource Glass}" Padding="14,8">
+                                <VerticalStackLayout VerticalOptions="Center">
+                                    <Label Text="{Binding Location.Name}" TextColor="{StaticResource Ink}" FontSize="14" />
+                                    <Label Text="{Binding ShortLine}" TextColor="{StaticResource InkSoft}" FontSize="12" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Footer controls -->
+                <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,8,0,4">
+                    <Button x:Name="RefreshBtn" Text="↻ Refresh" CornerRadius="20"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}" Padding="18,0" />
+                    <Button x:Name="UnitBtn" Text="°C" CornerRadius="20"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}"
+                            WidthRequest="56" Padding="0" />
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Platform heads are selected by the custom 'Heads' property so a SINGLE head can be built
+      without installing the other platforms' workloads. Override like: -p:Heads=maccatalyst
+      (build-app.sh does this for you). Default: android everywhere, plus windows on Windows.
+      (Same pattern as the Echoes solution. 'Heads' is ignored by the net10.0 Core project.)
+    -->
+    <Heads Condition="'$(Heads)' == ''">default</Heads>
+    <TargetFrameworks Condition="'$(Heads)' == 'default'">net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'default' and $([MSBuild]::IsOSPlatform('windows'))">net10.0-android;net10.0-windows10.0.19041.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'android'">net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'ios'">net10.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'maccatalyst'">net10.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'windows'">net10.0-windows10.0.19041.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'apple'">net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="'$(Heads)' == 'all'">net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SkyMood.App</RootNamespace>
+
+    <!-- App identity -->
+    <ApplicationTitle>Sky Mood</ApplicationTitle>
+    <ApplicationId>com.gamedevsolo.skymood</ApplicationId>
+    <ApplicationIdGuid>7c4b2a1e-9f3d-4b6a-8e2c-1d5f6a7b8c90</ApplicationIdGuid>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+
+    <!-- Minimum OS versions -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+    <DefaultItemExcludes>$(DefaultItemExcludes);._*;**/._*</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- App icon + splash (generated from SVG by the MAUI build) -->
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0A1428" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0A1428" BaseSize="128,128" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- .NET 8+ no longer auto-references this with UseMaui (warning MA002). -->
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SkyMood.Core\SkyMood.Core.csproj" />
+  </ItemGroup>
+
+</Project>

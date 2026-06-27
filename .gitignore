@@ -1,0 +1,14 @@
+# Build output (note: locally these are redirected to ~/.skymood-build by Directory.Build.props)
+[Bb]in/
+[Oo]bj/
+artifacts/
+
+# macOS junk (this volume is exFAT and spawns AppleDouble sidecars — never commit them)
+.DS_Store
+._*
+
+# IDE / tooling
+.vs/
+.idea/
+*.user
+*.suo

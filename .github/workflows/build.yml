@@ -1,0 +1,94 @@
+name: Build Sky Mood
+
+# Builds every MAUI head on a runner that has the right toolchain:
+#   • Android      → Linux  (JDK 17 + Android SDK)
+#   • iOS + MacCat → macOS  (Xcode)
+#   • Windows      → Windows
+# Each job uploads its app as a downloadable artifact. Config is Debug to mirror what's verified
+# locally and avoid AOT/trim surprises; flip BUILD_CONFIG to Release once you're signing for stores.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  BUILD_CONFIG: Debug
+  APP: SkyMood.App/SkyMood.App.csproj
+
+jobs:
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+      - name: Build self-contained APK
+        # EmbedAssembliesIntoApk makes the APK installable standalone (no Fast Deployment).
+        run: dotnet build "$APP" -c "$BUILD_CONFIG" -p:Heads=android -p:EmbedAssembliesIntoApk=true
+      - name: Collect APK
+        run: |
+          mkdir -p artifacts
+          find "$HOME/.skymood-build/SkyMood.App/bin/$BUILD_CONFIG/net10.0-android" \
+            -name "*-Signed.apk" -exec cp {} artifacts/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skymood-android
+          path: artifacts/*.apk
+          if-no-files-found: error
+
+  apple:
+    name: iOS + Mac Catalyst
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Install MAUI Apple workloads
+        run: dotnet workload install maui-ios maui-maccatalyst
+      - name: Build iOS (simulator, no code signing)
+        run: dotnet build "$APP" -c "$BUILD_CONFIG" -p:Heads=ios -p:RuntimeIdentifier=iossimulator-arm64
+      - name: Build Mac Catalyst
+        run: dotnet build "$APP" -c "$BUILD_CONFIG" -p:Heads=maccatalyst
+      - name: Collect .app bundles
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          base="$HOME/.skymood-build/SkyMood.App/bin/$BUILD_CONFIG"
+          ( cd "$base/net10.0-ios/iossimulator-arm64" && tar czf "$GITHUB_WORKSPACE/artifacts/skymood-ios-simulator.tgz" *.app ) || echo "iOS .app not found"
+          ( cd "$base"/net10.0-maccatalyst/maccatalyst-* && tar czf "$GITHUB_WORKSPACE/artifacts/skymood-maccatalyst.tgz" *.app ) || echo "MacCatalyst .app not found"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skymood-apple
+          path: artifacts/*.tgz
+          if-no-files-found: warn
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+      - name: Build Windows (unpackaged)
+        run: dotnet build $env:APP -c $env:BUILD_CONFIG -p:Heads=windows -p:WindowsPackageType=None
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skymood-windows
+          path: '**/bin/${{ env.BUILD_CONFIG }}/net10.0-windows*/**/SkyMood.App.exe'
+          if-no-files-found: warn
