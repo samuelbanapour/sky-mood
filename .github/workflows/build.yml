@@ -49,30 +49,27 @@ jobs:
 
   apple:
     name: iOS + Mac Catalyst
-    runs-on: macos-latest
+    # Pinned image (not -latest) so the .NET ↔ Xcode pairing is deterministic run-to-run.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Select the Xcode the iOS workload requires
-        # The GA maui-ios/maccatalyst workload pins an EXACT Xcode (currently 26.5). The runner
-        # carries several side by side (e.g. 26.3, 26.5, 26.6-RC), and neither the default nor
-        # "latest-stable" lands on it — so pick Xcode_26.5 explicitly, falling back to the newest
-        # non-prerelease if that name ever changes. Bump XCODE_MATCH when the workload bumps Xcode.
-        env:
-          XCODE_MATCH: '26.5'
+      # NOTE: deliberately NO actions/setup-dotnet here. The image's preinstalled .NET and its
+      # bundled MAUI workload manifests are matched to the image's Xcode. setup-dotnet would pull
+      # the newest manifest (.NET-for-iOS 26.5), which needs an Xcode this image doesn't carry.
+      - name: Select newest stable Xcode on the image
         run: |
-          target=$(ls -d /Applications/Xcode_${XCODE_MATCH}*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$target" ]; then
-            echo "Xcode ${XCODE_MATCH} not found. Available:"; ls -d /Applications/Xcode_*.app || true
-            target=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|candidate|_rc' | sort -V | tail -1)
-          fi
+          target=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|candidate|_rc' | sort -V | tail -1)
           echo "Selecting $target"
           sudo xcode-select -s "$target/Contents/Developer"
           xcodebuild -version
-      - name: Install MAUI Apple workloads
-        run: dotnet workload install maui-ios maui-maccatalyst
+      - name: Tooling diagnostics
+        run: |
+          dotnet --version
+          dotnet workload list || true
+      - name: Ensure Apple workloads (pinned to the image's manifests)
+        # --skip-manifest-update keeps the SDK band's manifest (matched to the image's Xcode)
+        # instead of bumping to the latest .NET-for-iOS, which would re-introduce the mismatch.
+        run: dotnet workload install maui-ios maui-maccatalyst --skip-manifest-update
       - name: Build iOS (simulator, no code signing)
         run: dotnet build "$APP" -c "$BUILD_CONFIG" -p:Heads=ios -p:RuntimeIdentifier=iossimulator-arm64
       - name: Build Mac Catalyst
