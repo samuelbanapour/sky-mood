@@ -49,14 +49,21 @@ jobs:
 
   apple:
     name: iOS + Mac Catalyst
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Select newest installed Xcode
+        # The latest maui-ios/maccatalyst workload pins a required Xcode version; the runner's
+        # default Xcode is often older. Pick the newest Xcode present on the image to match.
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$latest" ]; then latest=/Applications/Xcode.app; fi
+          echo "Selecting $latest"
+          sudo xcode-select -s "$latest/Contents/Developer"
+          xcodebuild -version
       - name: Install MAUI Apple workloads
         run: dotnet workload install maui-ios maui-maccatalyst
       - name: Build iOS (simulator, no code signing)
