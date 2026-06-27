@@ -1,0 +1,107 @@
+# Releasing Sky Mood (signed builds → TestFlight & Play Console)
+
+The [`release.yml`](../.github/workflows/build.yml) workflow builds **signed** store packages and
+uploads them. It runs on a version tag (`git tag v1.0.0 && git push --tags`) or manually from the
+**Actions → Release Sky Mood → Run workflow** button.
+
+It degrades gracefully: with **no** secrets it still builds (unsigned) artifacts so you can confirm
+the pipeline; add the secrets for a platform and that platform starts producing a **signed** build
+and uploading to the store. Set secrets at **Settings → Secrets and variables → Actions**
+(or `gh secret set NAME`).
+
+> You need the paid developer accounts first: **Apple Developer Program** ($99/yr) for iOS/TestFlight
+> and a **Google Play Developer** account ($25 once) for Play. Windows Store submission needs a
+> **Partner Center** account; signing an MSIX for sideloading just needs a code-signing cert.
+
+---
+
+## 1. Android → Play Console
+
+**A. Upload keystore** — run `./scripts/make-android-keystore.sh`. It creates `upload.keystore` and
+prints the secrets to set:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i upload.keystore` (whole string) |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password you chose |
+| `ANDROID_KEY_ALIAS` | `skymood-upload` (default) |
+| `ANDROID_KEY_PASSWORD` | key password you chose |
+
+**B. Create the app in [Play Console](https://play.google.com/console)** with package
+`com.gamedevsolo.skymood`, and **enrol in Play App Signing** (recommended). Do one manual upload of
+a first `.aab` if Play requires it before the API will accept uploads.
+
+**C. Play API service account** — in Google Cloud, create a service account with the *Google Play
+Android Developer API* enabled, download its JSON key, then in Play Console → *Users & permissions*
+invite that service-account email and grant **Release** access.
+
+| Secret | Value |
+|---|---|
+| `PLAY_SERVICE_ACCOUNT_JSON` | the full service-account JSON |
+
+Track is chosen by the workflow input (`internal` by default).
+
+---
+
+## 2. iOS → TestFlight
+
+**A. App record** — in [App Store Connect](https://appstoreconnect.apple.com) create an app with
+bundle id `com.gamedevsolo.skymood` (register it under *Certificates, IDs & Profiles* first).
+
+**B. Distribution certificate + provisioning profile**
+- Create an **Apple Distribution** certificate; export it as a `.p12` (with a password).
+- Create an **App Store** provisioning profile for the bundle id; download the `.mobileprovision`.
+
+| Secret | Value |
+|---|---|
+| `IOS_DIST_CERT_P12_BASE64` | `base64 -i dist.p12` |
+| `IOS_DIST_CERT_PASSWORD` | the .p12 export password |
+| `IOS_PROVISIONING_PROFILE_BASE64` | `base64 -i profile.mobileprovision` |
+| `IOS_SIGNING_IDENTITY` | e.g. `Apple Distribution: Your Name (TEAMID)` |
+| `IOS_PROVISIONING_PROFILE_NAME` | the profile's name |
+
+**C. App Store Connect API key** (for the TestFlight upload) — *Users and Access → Integrations →
+App Store Connect API* → create a key with **App Manager** role; download the `.p8` (once only).
+
+| Secret | Value |
+|---|---|
+| `ASC_KEY_ID` | the key id |
+| `ASC_ISSUER_ID` | the issuer id (top of that page) |
+| `ASC_API_KEY_P8_BASE64` | `base64 -i AuthKey_XXXX.p8` |
+
+The build produces a signed `.ipa` and `xcrun altool` uploads it to TestFlight.
+
+---
+
+## 3. Windows → MSIX
+
+For **sideload/Store** signing, supply a code-signing certificate (`.pfx`). For testing you can make
+a self-signed one:
+
+```powershell
+$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=GameDevSolo" `
+  -CertStoreLocation Cert:\CurrentUser\My
+Export-PfxCertificate -Cert $cert -FilePath skymood.pfx -Password (ConvertTo-SecureString -String "PFXPASS" -AsPlainText -Force)
+```
+
+| Secret | Value |
+|---|---|
+| `WINDOWS_PFX_BASE64` | `base64 -i skymood.pfx` |
+| `WINDOWS_PFX_PASSWORD` | the .pfx password |
+
+The job emits a signed `.msix`. **Microsoft Store** submission goes through Partner Center — once your
+app is registered there, add a submission step (Store REST API / `microsoft/store-submission`); it's
+left manual because it needs your Partner Center Azure AD app credentials and an existing listing.
+
+---
+
+## Cutting a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0          # triggers release.yml → signed builds + uploads
+# …or run it manually from the Actions tab (toggle "Upload to stores" off for a dry run)
+```
+
+Bump the version by tagging `vX.Y.Z`; the workflow feeds `X.Y.Z` as the display version and the run
+number as the build number. Without a tag (manual run) it uses `0.1.<run-number>`.

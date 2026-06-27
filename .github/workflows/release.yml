@@ -1,0 +1,230 @@
+name: Release Sky Mood
+
+# Signed store builds + uploads. Triggered by a version tag (e.g. v1.2.0) or run manually.
+#
+# Every job DEGRADES GRACEFULLY: with no secrets it still produces an (unsigned/debug-signed)
+# build artifact so you can see it works; add the secrets below and it produces a *signed* build
+# and uploads to the store. Nothing here hard-fails just because a secret is missing.
+#
+# Required GitHub secrets (see docs/RELEASE.md for how to obtain each):
+#   Android : ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#             ANDROID_KEY_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON
+#   iOS     : IOS_DIST_CERT_P12_BASE64, IOS_DIST_CERT_PASSWORD, IOS_PROVISIONING_PROFILE_BASE64,
+#             IOS_SIGNING_IDENTITY, IOS_PROVISIONING_PROFILE_NAME,
+#             ASC_KEY_ID, ASC_ISSUER_ID, ASC_API_KEY_P8_BASE64
+#   Windows : WINDOWS_PFX_BASE64, WINDOWS_PFX_PASSWORD
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      android_track:
+        description: 'Play Console track'
+        type: choice
+        default: internal
+        options: [ internal, alpha, beta, production ]
+      upload:
+        description: 'Upload to stores (needs secrets)'
+        type: boolean
+        default: true
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  APP: SkyMood.App/SkyMood.App.csproj
+  APP_ID: com.gamedevsolo.skymood
+
+jobs:
+  # ----------------------------------------------------------------------------- version
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      display: ${{ steps.v.outputs.display }}
+      build: ${{ steps.v.outputs.build }}
+    steps:
+      - id: v
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then disp="${GITHUB_REF_NAME#v}"; else disp="0.1.${GITHUB_RUN_NUMBER}"; fi
+          echo "display=$disp" >> "$GITHUB_OUTPUT"
+          echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Version $disp (build ${GITHUB_RUN_NUMBER})"
+
+  # ----------------------------------------------------------------------------- Android
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '${{ env.DOTNET_VERSION }}' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - run: dotnet workload install maui-android
+
+      - name: Decode keystore (if provided)
+        id: ks
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 — building an unsigned AAB for verification."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build AAB
+        run: |
+          common=(-c Release -f net10.0-android -p:AndroidPackageFormat=aab
+                  -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
+                  -p:ApplicationVersion=${{ needs.version.outputs.build }})
+          if [ "${{ steps.ks.outputs.signed }}" = "true" ]; then
+            dotnet publish "$APP" "${common[@]}" \
+              -p:AndroidKeyStore=true \
+              -p:AndroidSigningKeyStore="$RUNNER_TEMP/upload.keystore" \
+              -p:AndroidSigningStorePass="$ANDROID_KEYSTORE_PASSWORD" \
+              -p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS" \
+              -p:AndroidSigningKeyPass="$ANDROID_KEY_PASSWORD"
+          else
+            dotnet publish "$APP" "${common[@]}"
+          fi
+          mkdir -p out
+          find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-android" -name "*.aab" -exec cp {} out/ \;
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with: { name: skymood-android-aab, path: out/*.aab, if-no-files-found: error }
+
+      - name: Upload to Google Play
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' && steps.ks.outputs.signed == 'true' && (github.event_name == 'push' || inputs.upload) }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.APP_ID }}
+          releaseFiles: out/*.aab
+          track: ${{ inputs.android_track || 'internal' }}
+          status: completed
+
+  # ----------------------------------------------------------------------------- iOS
+  ios:
+    needs: version
+    runs-on: macos-15
+    env:
+      IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+      IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      IOS_SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
+      IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      # Use the image's matched .NET + a validated, complete Xcode (see build.yml for the why).
+      - run: dotnet workload install maui-ios maui-maccatalyst --skip-manifest-update
+      - name: Select a working Xcode matching the iOS workload
+        run: |
+          pack=$(ls -d "${DOTNET_ROOT:-$HOME/.dotnet}"/packs/Microsoft.iOS.Sdk.net10.0_* 2>/dev/null | sort -V | tail -1)
+          need=$(basename "$pack" | sed -E 's/.*net10\.0_([0-9.]+)$/\1/')
+          xc=""
+          for cand in $(ls -d /Applications/Xcode_${need}*.app 2>/dev/null | grep -viE 'beta|candidate|_rc' | sort -Vr); do
+            if DEVELOPER_DIR="$cand/Contents/Developer" xcrun --sdk macosx --find actool >/dev/null 2>&1; then xc="$cand"; break; fi
+          done
+          [ -z "$xc" ] && { echo "No complete Xcode $need"; ls -d /Applications/Xcode_*.app; exit 1; }
+          sudo xcode-select -s "$xc/Contents/Developer"
+          echo "DEVELOPER_DIR=$xc/Contents/Developer" >> "$GITHUB_ENV"
+          echo "MD_APPLE_SDK_ROOT=$xc" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      - name: Import signing assets (if provided)
+        id: sign
+        run: |
+          if [ -z "$IOS_DIST_CERT_P12_BASE64" ] || [ -z "$IOS_PROVISIONING_PROFILE_BASE64" ]; then
+            echo "No iOS signing secrets — building unsigned (simulator) to verify Release compiles."
+            echo "signed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"; PW=$(openssl rand -hex 12)
+          security create-keychain -p "$PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$PW" "$KEYCHAIN"
+          echo "$IOS_DIST_CERT_P12_BASE64" | base64 -d > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$IOS_DIST_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d > "$HOME/Library/MobileDevice/Provisioning Profiles/skymood.mobileprovision"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build .ipa (signed) or compile-check (unsigned)
+        run: |
+          if [ "${{ steps.sign.outputs.signed }}" = "true" ]; then
+            dotnet publish "$APP" -c Release -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
+              -p:ArchiveOnBuild=true -p:BuildIpa=true \
+              -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }} \
+              -p:ApplicationVersion=${{ needs.version.outputs.build }} \
+              -p:CodesignKey="$IOS_SIGNING_IDENTITY" \
+              -p:CodesignProvision="$IOS_PROVISIONING_PROFILE_NAME"
+            mkdir -p out; find "$HOME/.skymood-build" -name "*.ipa" -exec cp {} out/ \;
+            ls -la out
+          else
+            dotnet build "$APP" -c Release -f net10.0-ios -p:RuntimeIdentifier=iossimulator-arm64
+          fi
+
+      - name: Upload .ipa artifact
+        if: ${{ steps.sign.outputs.signed == 'true' }}
+        uses: actions/upload-artifact@v4
+        with: { name: skymood-ios-ipa, path: out/*.ipa, if-no-files-found: error }
+
+      - name: Upload to TestFlight
+        if: ${{ steps.sign.outputs.signed == 'true' && env.ASC_API_KEY_P8_BASE64 != '' && (github.event_name == 'push' || inputs.upload) }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_API_KEY_P8_BASE64" | base64 -d > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          xcrun altool --upload-app -f out/*.ipa -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+  # ----------------------------------------------------------------------------- Windows
+  windows:
+    needs: version
+    runs-on: windows-latest
+    defaults: { run: { shell: bash } }   # reuse the same bash snippets as the other jobs
+    env:
+      WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+      WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '${{ env.DOTNET_VERSION }}' }
+      - run: dotnet workload install maui-windows
+
+      - name: Build MSIX
+        run: |
+          common=(-c Release -f net10.0-windows10.0.19041.0
+                  -p:RuntimeIdentifierOverride=win10-x64
+                  -p:GenerateAppxPackageOnBuild=true
+                  -p:AppxPackageDir=msix/
+                  -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
+                  -p:ApplicationVersion=${{ needs.version.outputs.build }})
+          if [ -n "$WINDOWS_PFX_BASE64" ]; then
+            echo "$WINDOWS_PFX_BASE64" | base64 -d > cert.pfx
+            dotnet publish "$APP" "${common[@]}" \
+              -p:AppxPackageSigningEnabled=true \
+              -p:PackageCertificateKeyFile=cert.pfx \
+              -p:PackageCertificatePassword="$WINDOWS_PFX_PASSWORD"
+          else
+            echo "No WINDOWS_PFX_BASE64 — building an unsigned MSIX for verification."
+            dotnet publish "$APP" "${common[@]}" -p:AppxPackageSigningEnabled=false
+          fi
+          mkdir -p out; find . -path '*/msix/*' \( -name '*.msix' -o -name '*.msixbundle' \) -exec cp {} out/ \; || true
+          ls -la out || echo "no msix produced"
+
+      - uses: actions/upload-artifact@v4
+        with: { name: skymood-windows-msix, path: out/*, if-no-files-found: warn }
+      # Store submission: Microsoft Store uses Partner Center. Once your app is registered there,
+      # add a submission step (e.g. microsoft/store-submission or the Store REST API). Left manual
+      # because it needs your Partner Center Azure AD credentials + an existing app listing.
