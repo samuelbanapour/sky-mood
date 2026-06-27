@@ -20,7 +20,7 @@
     background:linear-gradient(180deg,var(--sky-top),var(--sky-bot));
     transition:background 1.5s ease;-webkit-font-smoothing:antialiased;min-height:100%;
   }
-  #scene{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  #scene{position:fixed;inset:-30px;z-index:0;overflow:hidden;pointer-events:none;transition:transform .25s ease-out}
   #flash{position:fixed;inset:0;z-index:1;background:#fff;opacity:0;pointer-events:none}
   #app{position:relative;z-index:2;min-height:100dvh;display:flex;flex-direction:column;
     align-items:center;justify-content:flex-start;padding:max(18px,env(safe-area-inset-top)) 18px 90px;
@@ -108,6 +108,30 @@
   .hidden{display:none!important}
   .fade{animation:fadeUp .7s ease both}
   @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ---------- playful extras ---------- */
+  .quip{font-size:clamp(14px,4vw,17px);font-weight:600;opacity:.95;margin:-2px 0 2px;min-height:1.2em}
+  #emoji{cursor:pointer}
+  #emoji:active{transform:scale(.9)}
+  .wiggle{animation:wiggle .6s ease}
+  @keyframes wiggle{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg) scale(1.12)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}
+  .temp{cursor:pointer}
+  .bird{position:absolute;font-size:20px;animation:flapMove linear infinite;will-change:transform}
+  @keyframes flapMove{from{transform:translateX(-12vw)}to{transform:translateX(118vw)}}
+  .shoot{position:absolute;width:3px;height:3px;background:#fff;border-radius:50%;box-shadow:0 0 7px 2px #fff;animation:shoot linear infinite;opacity:0}
+  @keyframes shoot{0%{transform:translate(0,0) scale(1);opacity:0}4%{opacity:1}22%{transform:translate(240px,170px) scale(.3);opacity:0}100%{opacity:0}}
+  .rainbow{position:absolute;left:50%;top:12%;width:340px;height:170px;margin-left:-170px;border-radius:170px 170px 0 0;
+    border:11px solid;border-image:linear-gradient(90deg,#ff5e5e,#ffb14e,#ffe14e,#74e07d,#5ec8ff,#9a7dff) 1;border-bottom:none;opacity:0;animation:rbow 1.3s ease .3s forwards;filter:saturate(1.25)}
+  @keyframes rbow{to{opacity:.5}}
+  .kite{position:absolute;font-size:30px;animation:kiteFly 9s ease-in-out infinite;will-change:transform}
+  @keyframes kiteFly{0%,100%{transform:translate(0,0) rotate(-8deg)}50%{transform:translate(42px,-28px) rotate(10deg)}}
+  .spark{position:fixed;pointer-events:none;z-index:6;will-change:transform,opacity;animation:spark .9s ease-out forwards}
+  @keyframes spark{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(.4);opacity:0}}
+  .chip,.bar button,.footer button{transition:transform .15s ease,background .2s}
+  .chip:hover{transform:translateY(-3px)}
+  .chip:active{transform:scale(.94)}
+  .bar button:active,.footer button:active{transform:scale(.92)}
+  .live{cursor:pointer;user-select:none}
 </style>
 </head>
 <body>
@@ -136,6 +160,7 @@
       <div class="emoji" id="emoji">☀️</div>
       <div class="temp"><span id="t">--</span><span class="unit" id="unit">°C</span></div>
       <div class="desc" id="desc">—</div>
+      <div class="quip" id="quip"></div>
       <div class="place"><span id="place">—</span><span class="dot">·</span><span id="time">—</span></div>
       <div class="stats">
         <div class="stat"><div class="label">Feels like</div><div class="value" id="feels">—</div></div>
@@ -183,6 +208,7 @@ const toDisp=c=>c==null?"--":(state.unit==="C"?Math.round(c):Math.round(c*9/5+32
 function show(which){
   $("loader").classList.toggle("hidden",which!=="loader");
   $("weather").classList.toggle("hidden",which!=="weather");
+  if(which==="loader") startLoader(); else stopLoader();
 }
 
 // ---------- data ----------
@@ -231,6 +257,7 @@ function render(reading,badge,note){
   $("t").textContent=toDisp(cur.temperature_2m);
   $("unit").textContent="°"+state.unit;
   $("desc").textContent=info.l+(day?"":" · night");
+  $("quip").textContent=quipFor(info,cur.temperature_2m,day);
   $("place").textContent=loc.name||`${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`;
   $("time").textContent="as of "+new Date(reading.at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
   $("feels").textContent=toDisp(cur.apparent_temperature)+"°";
@@ -239,30 +266,42 @@ function render(reading,badge,note){
   $("hl").textContent=toDisp(daily.temperature_2m_max[0])+"° / "+toDisp(daily.temperature_2m_min[0])+"°";
   $("badge").textContent=badge; $("badge").className="pill"+(badge==="OFFLINE"?" offline":"");
   $("note").textContent=note;
-  paint(info,day);
+  paint(info,day,cur.wind_speed_10m);
   state.data=reading;
   buildChips();
   show("weather");
+  if(state.celebrate){state.celebrate=false;celebrate();}
 }
 
 // ---------- the fun part ----------
-function paint(info,day){
+function paint(info,day,wind){
   const scene=$("scene"); scene.innerHTML=""; $("flash").classList.remove("flashing");
   const g=GRAD[info.s]||GRAD.clear; const [top,bot]=day?g.day:g.night;
   document.body.style.background=`linear-gradient(180deg,${top} 0%,${bot} 100%)`;
   const el=(cls,css)=>{const x=document.createElement("div");x.className=cls;if(css)x.style.cssText=css;scene.appendChild(x);return x;};
-  if(day&&(info.s==="clear"||info.s==="fewclouds")) el("sun");
-  else if(!day){
+  const wf=1/(1+(wind||0)/28);        // higher wind → shorter durations → faster drift
+  const breezy=(wind||0)>=22;
+
+  if(day&&(info.s==="clear"||info.s==="fewclouds")){
+    el("sun");
+    const birds=2+Math.floor(Math.random()*2);
+    for(let i=0;i<birds;i++){const b=el("bird",`top:${12+Math.random()*30}%;animation-duration:${(10+Math.random()*8)*wf}s;animation-delay:-${Math.random()*12}s`);b.textContent="🐦";}
+  } else if(!day){
     if(info.s==="clear"||info.s==="fewclouds") el("moon");
     const n=info.s==="clear"?70:35;
     for(let i=0;i<n;i++){const s=Math.random()*2.5+1;el("star",`left:${Math.random()*100}%;top:${Math.random()*55}%;width:${s}px;height:${s}px;animation-delay:${Math.random()*3}s`);}
+    if(info.s==="clear") for(let i=0;i<2;i++) el("shoot",`left:${Math.random()*60}%;top:${Math.random()*30}%;animation-duration:${5+Math.random()*4}s;animation-delay:${2+Math.random()*8}s`);
   }
+
   let clouds=info.s==="fewclouds"?3:info.s==="cloudy"?6:(info.s==="rain"||info.s==="storm"||info.s==="snow")?5:0;
   for(let i=0;i<clouds;i++){const w=120+Math.random()*160;const dark=info.s==="rain"||info.s==="storm";
-    el("cloud",`width:${w}px;height:${w*.34}px;top:${5+Math.random()*38}%;opacity:${dark?.85:.92};${dark?"background:#c3ccd6;":""}animation-duration:${24+Math.random()*30}s;animation-delay:-${Math.random()*30}s`);}
+    el("cloud",`width:${w}px;height:${w*.34}px;top:${5+Math.random()*38}%;opacity:${dark?.85:.92};${dark?"background:#c3ccd6;":""}animation-duration:${(24+Math.random()*30)*wf}s;animation-delay:-${Math.random()*30}s`);}
   if(info.rain) for(let i=0;i<info.rain;i++) el("drop",`left:${Math.random()*100}%;height:${40+Math.random()*45}px;animation-duration:${.4+Math.random()*.5}s;animation-delay:-${Math.random()*2}s;opacity:${.4+Math.random()*.5}`);
   if(info.snow){const G=["❄","❅","❆","•"];for(let i=0;i<info.snow;i++){const f=el("flake",`left:${Math.random()*100}%;font-size:${8+Math.random()*18}px;animation-duration:${5+Math.random()*7}s;animation-delay:-${Math.random()*8}s;opacity:${.5+Math.random()*.5}`);f.textContent=G[Math.floor(Math.random()*G.length)];}}
   if(info.s==="fog") for(let i=0;i<4;i++) el("fog",`top:${20+i*20}%;animation-duration:${40+i*10}s;animation-delay:-${i*8}s`);
+
+  if(day&&info.s==="rain") el("rainbow");                       // a cheery arc when it rains in daylight
+  if(day&&breezy&&info.s!=="storm"&&info.s!=="fog"){const k=el("kite",`left:${20+Math.random()*55}%;top:${30+Math.random()*18}%`);k.textContent="🪁";}
   if(info.s==="storm") $("flash").classList.add("flashing");
 }
 
@@ -286,7 +325,7 @@ function buildChips(){
     const c=cacheGet(p); const div=document.createElement("div"); div.className="chip";
     const t=c?`${toDisp(c.cur.temperature_2m)}° ${(WX[c.cur.weather_code]||WX[0]).e}`:"tap to load";
     div.innerHTML=`<b>${p.name||"Place"}</b><span>${t}</span>`;
-    div.onclick=()=>loadWeather(p);
+    div.onclick=()=>{state.celebrate=true;loadWeather(p);};
     chips.appendChild(div);
   });
 }
@@ -303,16 +342,16 @@ $("search").addEventListener("input",e=>{
     box.innerHTML=""; res.forEach(loc=>{
       const d=document.createElement("div");
       d.textContent=[loc.name,loc.admin,loc.country].filter(Boolean).join(", ");
-      d.onclick=()=>{box.style.display="none";$("search").value="";loadWeather(loc);};
+      d.onclick=()=>{box.style.display="none";$("search").value="";state.celebrate=true;loadWeather(loc);};
       box.appendChild(d);
     });
     box.style.display="block";
   },280);
 });
-$("searchBtn").onclick=async()=>{const r=await geocode($("search").value);if(r[0]){$("results").style.display="none";$("search").value="";loadWeather(r[0]);}};
+$("searchBtn").onclick=async()=>{const r=await geocode($("search").value);if(r[0]){$("results").style.display="none";$("search").value="";state.celebrate=true;loadWeather(r[0]);}};
 $("search").addEventListener("keydown",e=>{if(e.key==="Enter")$("searchBtn").click();});
 document.addEventListener("click",e=>{if(!e.target.closest(".bar"))$("results").style.display="none";});
-$("unit").onclick=()=>{state.unit=state.unit==="C"?"F":"C";localStorage.setItem(LS+".unit",state.unit);if(state.data)render(state.data,$("badge").textContent,$("note").textContent);};
+$("unit").onclick=(e)=>{e.stopPropagation();state.unit=state.unit==="C"?"F":"C";localStorage.setItem(LS+".unit",state.unit);if(state.data)render(state.data,$("badge").textContent,$("note").textContent);};
 $("refreshBtn").onclick=()=>{if(state.loc)loadWeather(state.loc);else boot();};
 $("locateBtn").onclick=()=>useGeo(true);
 
@@ -333,6 +372,52 @@ function fallback(){
   if(places[0]) return loadWeather(places[0]);
   loadWeather({name:"London",admin:"England",country:"GB",lat:51.5074,lon:-0.1278});
 }
+// ---------- playful extras ----------
+const quipFor=(info,c,day)=>{
+  const k={
+    clear:day?["Perfect day to be outside ☀️","Grab your shades 😎","Not a cloud in sight!","Vitamin-D o'clock 🌻"]:["Clear skies, sweet dreams 🌙","Stargazing weather ✨","Calm & clear tonight"],
+    fewclouds:["Sun's playing peek-a-boo ⛅","A few clouds just visiting ☁️","Gentle skies today"],
+    cloudy:["A cosy, cloudy one ☁️","Soft grey skies","Cloud-blanket mode: on"],
+    fog:["Mysterious out there… 🌫️","Mind the fog!","Everything's a bit dreamy"],
+    rain:["Umbrella weather ☂️","Liquid sunshine 🌧️","Puddle-jumping time!","Don't forget your brolly"],
+    snow:["Snowball ammo incoming ❄️","Hot cocoa highly advised ☕","Let it snow! ⛄","Bundle up, buttercup"],
+    storm:["Whoa — thunderstorm! ⛈️","Nature's light show ⚡","Cosy-up-inside weather"]
+  }[info.s]||["Whatever the weather 🌡️"];
+  const pool=k.slice();
+  if(c<=0)pool.push("Brrr… freezing! 🥶"); else if(c>=32)pool.push("Scorcher alert! 🥵","Stay hydrated 💧");
+  return pool[Math.floor(Math.random()*pool.length)];
+};
+function burstAt(x,y,emojis){
+  for(let i=0;i<14;i++){const s=document.createElement("div");s.className="spark";s.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+    const a=Math.random()*6.28,d=60+Math.random()*90;
+    s.style.left=x+"px";s.style.top=y+"px";
+    s.style.setProperty("--dx",Math.cos(a)*d+"px");s.style.setProperty("--dy",(Math.sin(a)*d-40)+"px");
+    s.style.setProperty("--r",(Math.random()*360|0)+"deg");s.style.fontSize=(14+Math.random()*16)+"px";
+    document.body.appendChild(s);setTimeout(()=>s.remove(),950);}
+}
+function celebrate(){const r=$("weather").getBoundingClientRect();burstAt(r.left+r.width/2,r.top+130,["🎉","✨","🌈","⭐","💫"]);}
+function party(){const em=["🎉","🌈","☀️","⛅","🌧️","❄️","⚡","✨","🎈","🥳"];
+  for(let i=0;i<60;i++)setTimeout(()=>{const d=document.createElement("div");d.className="spark";d.textContent=em[Math.floor(Math.random()*em.length)];
+    d.style.left=Math.random()*100+"vw";d.style.top="-30px";d.style.fontSize=(18+Math.random()*22)+"px";
+    d.style.setProperty("--dx",(Math.random()*120-60)+"px");d.style.setProperty("--dy",(innerHeight+90)+"px");
+    d.style.setProperty("--r",(Math.random()*720-360)+"deg");d.style.animationDuration=(2+Math.random()*1.6)+"s";
+    document.body.appendChild(d);setTimeout(()=>d.remove(),3700);},i*35);
+}
+const loadMsgs=["Finding your sky…","Bribing the clouds ☁️","Asking the sun nicely ☀️","Counting raindrops 💧","Warming up the forecast…","Herding the breeze 🌬️"];
+let _li=0,_lt;
+function startLoader(){const d=$("loader").querySelector(".desc");clearInterval(_lt);_lt=setInterval(()=>{d.textContent=loadMsgs[(++_li)%loadMsgs.length];},1100);}
+function stopLoader(){clearInterval(_lt);}
+$("emoji").addEventListener("click",e=>{const n=$("emoji");n.classList.remove("wiggle");void n.offsetWidth;n.classList.add("wiggle");burstAt(e.clientX,e.clientY,[n.textContent]);});
+document.querySelector(".temp").addEventListener("click",e=>burstAt(e.clientX,e.clientY,["🎉","✨","🌈","⭐","💧","😎"]));
+let _lc=0,_lct;
+document.querySelector(".live").addEventListener("click",()=>{_lc++;clearTimeout(_lct);_lct=setTimeout(()=>_lc=0,1200);if(_lc>=5){_lc=0;party();}});
+// gentle parallax (mouse + device tilt)
+const _scene=$("scene");let _px=0,_py=0,_tx=0,_ty=0,_raf;
+function _loop(){_tx+=(_px-_tx)*.08;_ty+=(_py-_ty)*.08;_scene.style.transform=`translate(${_tx}px,${_ty}px)`;_raf=requestAnimationFrame(_loop);}
+function setParallax(nx,ny){_px=nx*16;_py=ny*16;if(!_raf)_loop();}
+addEventListener("mousemove",e=>setParallax(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5));
+addEventListener("deviceorientation",e=>{if(e.gamma!=null)setParallax(Math.max(-1,Math.min(1,e.gamma/45)),Math.max(-1,Math.min(1,((e.beta||45)-45)/45)));});
+
 function boot(){ buildChips(); useGeo(false); }
 boot();
 </script>
