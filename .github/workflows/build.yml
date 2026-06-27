@@ -56,12 +56,6 @@ jobs:
       # NOTE: deliberately NO actions/setup-dotnet here. The image's preinstalled .NET and its
       # bundled MAUI workload manifests are matched to the image's Xcode. setup-dotnet would pull
       # the newest manifest (.NET-for-iOS 26.5), which needs an Xcode this image doesn't carry.
-      - name: Select newest stable Xcode on the image
-        run: |
-          target=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|candidate|_rc' | sort -V | tail -1)
-          echo "Selecting $target"
-          sudo xcode-select -s "$target/Contents/Developer"
-          xcodebuild -version
       - name: Tooling diagnostics
         run: |
           dotnet --version
@@ -70,6 +64,18 @@ jobs:
         # --skip-manifest-update keeps the SDK band's manifest (matched to the image's Xcode)
         # instead of bumping to the latest .NET-for-iOS, which would re-introduce the mismatch.
         run: dotnet workload install maui-ios maui-maccatalyst --skip-manifest-update
+      - name: Select the Xcode the installed iOS workload requires
+        # The installed .NET-for-iOS pack name encodes its required Xcode (…net10.0_<XX.Y>). Pick
+        # that exact Xcode from the image so the version gate passes for both iOS and Mac Catalyst.
+        run: |
+          pack=$(ls -d "${DOTNET_ROOT:-$HOME/.dotnet}"/packs/Microsoft.iOS.Sdk.net10.0_* 2>/dev/null | sort -V | tail -1)
+          need=$(basename "$pack" | sed -E 's/.*net10\.0_([0-9.]+)$/\1/')
+          echo "Installed iOS workload requires Xcode $need"
+          xc=$(ls -d /Applications/Xcode_${need}*.app 2>/dev/null | grep -viE 'beta|candidate|_rc' | sort -V | head -1)
+          if [ -z "$xc" ]; then echo "No matching Xcode $need on runner:"; ls -d /Applications/Xcode_*.app; exit 1; fi
+          echo "Selecting $xc"
+          sudo xcode-select -s "$xc/Contents/Developer"
+          xcodebuild -version
       - name: Build iOS (simulator, no code signing)
         run: dotnet build "$APP" -c "$BUILD_CONFIG" -p:Heads=ios -p:RuntimeIdentifier=iossimulator-arm64
       - name: Build Mac Catalyst
