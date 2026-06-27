@@ -71,20 +71,26 @@ jobs:
           pack=$(ls -d "${DOTNET_ROOT:-$HOME/.dotnet}"/packs/Microsoft.iOS.Sdk.net10.0_* 2>/dev/null | sort -V | tail -1)
           need=$(basename "$pack" | sed -E 's/.*net10\.0_([0-9.]+)$/\1/')
           echo "Installed iOS workload requires Xcode $need"
-          # Some same-version Xcodes on the image are partial (missing SDKs), so pick one that
-          # actually has both the macOS SDK and the iPhone Simulator platform laid down.
+          # Some same-version Xcodes on the image are broken stubs (the SDK folder exists but the
+          # toolchain doesn't resolve — "actool not found"). Functionally validate each candidate,
+          # newest patch first, and keep the first whose toolchain actually works.
           xc=""
-          for cand in $(ls -d /Applications/Xcode_${need}*.app 2>/dev/null | grep -viE 'beta|candidate|_rc' | sort -V); do
-            if [ -d "$cand/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ] \
-               && [ -d "$cand/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs" ]; then
-              xc="$cand"; break
+          for cand in $(ls -d /Applications/Xcode_${need}*.app 2>/dev/null | grep -viE 'beta|candidate|_rc' | sort -Vr); do
+            if DEVELOPER_DIR="$cand/Contents/Developer" xcrun --sdk macosx --find actool >/dev/null 2>&1; then
+              xc="$cand"; echo "  OK  $cand (working toolchain)"; break
+            else
+              echo "  bad $cand (incomplete — actool unresolved)"
             fi
           done
           if [ -z "$xc" ]; then echo "No complete Xcode $need on runner:"; ls -d /Applications/Xcode_*.app; exit 1; fi
           echo "Selecting $xc"
           sudo xcode-select -s "$xc/Contents/Developer"
+          # Export so the .NET build uses THIS Xcode. The image presets MD_APPLE_SDK_ROOT, which
+          # otherwise overrides xcode-select and points the build at the wrong/partial Xcode.
+          echo "DEVELOPER_DIR=$xc/Contents/Developer" >> "$GITHUB_ENV"
+          echo "MD_APPLE_SDK_ROOT=$xc" >> "$GITHUB_ENV"
           xcodebuild -version
-          xcrun --sdk macosx --show-sdk-path
+          xcrun --sdk macosx --find actool
       - name: Build iOS (simulator, no code signing)
         run: dotnet build "$APP" -c "$BUILD_CONFIG" -p:Heads=ios -p:RuntimeIdentifier=iossimulator-arm64
       - name: Build Mac Catalyst
