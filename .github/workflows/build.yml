@@ -55,15 +55,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Select newest installed Xcode
-        # The latest maui-ios/maccatalyst workload pins a required Xcode version; the runner's
-        # default Xcode is often older. Pick the newest Xcode present on the image to match.
-        run: |
-          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$latest" ]; then latest=/Applications/Xcode.app; fi
-          echo "Selecting $latest"
-          sudo xcode-select -s "$latest/Contents/Developer"
-          xcodebuild -version
+      - name: Select latest stable Xcode
+        # The GA maui-ios/maccatalyst workload pins an exact Xcode version. 'latest-stable' selects
+        # the newest released Xcode (excluding betas/RCs), which matches the GA workload — the
+        # runner's default is often older and a raw "newest" can grab a too-new RC.
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - name: Install MAUI Apple workloads
         run: dotnet workload install maui-ios maui-maccatalyst
       - name: Build iOS (simulator, no code signing)
