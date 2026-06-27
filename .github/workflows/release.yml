@@ -174,11 +174,21 @@ jobs:
             mkdir -p out; find "$HOME/.skymood-build" -name "*.ipa" -exec cp {} out/ \;
             ls -la out
           else
-            dotnet build "$APP" -c Release -p:Heads=ios -p:RuntimeIdentifier=iossimulator-arm64
+            echo "No signing secrets — building an UNSIGNED device .ipa (inspect-only; install needs resigning)."
+            dotnet build "$APP" -c Release -p:Heads=ios -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
+              -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }} \
+              -p:ApplicationVersion=${{ needs.version.outputs.build }} \
+              -p:EnableCodeSigning=false -p:CodesignKey="" -p:_RequireCodeSigning=false
+            mkdir -p out
+            app=$(find "$HOME/.skymood-build" -type d -path '*net10.0-ios*ios-arm64*/*.app' | head -1)
+            if [ -z "$app" ]; then echo "No device .app produced:"; find "$HOME/.skymood-build" -maxdepth 8 -name '*.app' -type d; exit 1; fi
+            echo "Packaging $app into an .ipa"
+            rm -rf Payload && mkdir Payload && cp -R "$app" Payload/
+            zip -qr "out/SkyMood-${{ needs.version.outputs.display }}-unsigned.ipa" Payload
+            ls -la out
           fi
 
       - name: Upload .ipa artifact
-        if: ${{ steps.sign.outputs.signed == 'true' }}
         uses: actions/upload-artifact@v4
         with: { name: skymood-ios-ipa, path: out/*.ipa, if-no-files-found: error }
 
