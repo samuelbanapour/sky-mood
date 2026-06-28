@@ -207,7 +207,8 @@ public sealed class WeatherScene : Control
         {
             var c = _clouds[i];
             double x = (Frac(c.x + _time * c.speed * WindFactor) * 1.4 - 0.2) * w;
-            double y = c.y * h, cw = 90 + c.scale * 150, ch = cw * 0.34;
+            // keep clouds in the top band (this window is tall) so they don't cover the readout
+            double y = c.y * h * 0.42, cw = 70 + c.scale * 110, ch = cw * 0.34;
             g.DrawRectangle(br, null, new RoundedRect(new Rect(x, y, cw, ch), ch * 0.5));
             g.DrawEllipse(br, null, new Point(x + cw * 0.35, y - ch * 0.05), cw * 0.25, ch * 0.85);
             g.DrawEllipse(br, null, new Point(x + cw * 0.68, y - ch * 0.1), cw * 0.27, ch * 1.0);
