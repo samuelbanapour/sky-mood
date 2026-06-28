@@ -241,3 +241,28 @@ jobs:
       # Store submission: Microsoft Store uses Partner Center. Once your app is registered there,
       # add a submission step (e.g. microsoft/store-submission or the Store REST API). Left manual
       # because it needs your Partner Center Azure AD credentials + an existing app listing.
+
+  # ----------------------------------------------------------------------------- Console (desktop CLI)
+  # Self-contained, single-file terminal builds of SkyMood.Console for Windows / Linux / macOS.
+  # MAUI has no Linux GUI, so this is the native Linux story (the web app covers graphical Linux).
+  console:
+    runs-on: ubuntu-latest      # the console app is managed-only, so one runner cross-publishes all RIDs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '${{ env.DOTNET_VERSION }}' }
+      - name: Publish self-contained single-file binaries
+        run: |
+          mkdir -p out
+          for rid in linux-x64 linux-arm64 win-x64 osx-x64 osx-arm64; do
+            echo "::group::$rid"
+            dotnet publish SkyMood.Console/SkyMood.Console.csproj -c Release -r "$rid" \
+              --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+              -o "pub/$rid"
+            if [ -f "pub/$rid/SkyMood.Console.exe" ]; then cp "pub/$rid/SkyMood.Console.exe" "out/skymood-$rid.exe";
+            else cp "pub/$rid/SkyMood.Console" "out/skymood-$rid"; fi
+            echo "::endgroup::"
+          done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: skymood-console, path: out/*, if-no-files-found: error }
