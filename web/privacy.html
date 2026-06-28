@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0A1428" />
+<title>Sky Mood · Privacy Policy</title>
+<meta name="description" content="Privacy policy for the Sky Mood weather app and web edition." />
+<style>
+  :root{ --bg1:#0b1d3a; --bg2:#1b3a63; --fg:#eef2f9; --soft:#aebbd0; --card:rgba(255,255,255,.06); --edge:rgba(255,255,255,.14); --accent:#ffd86b; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--fg);background:linear-gradient(180deg,var(--bg1),var(--bg2));min-height:100vh;line-height:1.6;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 22px 80px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-bottom:6px}
+  .brand .dot{font-size:22px}
+  h1{font-size:clamp(26px,6vw,38px);font-weight:300;letter-spacing:-.5px;margin:14px 0 4px}
+  .updated{color:var(--soft);font-size:14px;margin-bottom:28px}
+  .lead{font-size:17px;background:var(--card);border:1px solid var(--edge);border-radius:16px;padding:16px 18px;margin-bottom:30px}
+  h2{font-size:19px;font-weight:600;margin:28px 0 8px}
+  p,li{color:#dde4f1;font-size:15.5px}
+  ul{margin:6px 0 6px 20px}
+  li{margin:4px 0}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .tldr{color:var(--accent);font-weight:600}
+  code{background:rgba(255,255,255,.1);padding:1px 6px;border-radius:6px;font-size:13.5px}
+  .foot{margin-top:40px;color:var(--soft);font-size:13px;border-top:1px solid var(--edge);padding-top:16px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><span class="dot">🌤️</span> Sky Mood</div>
+    <h1>Privacy Policy</h1>
+    <div class="updated">Last updated: 27 June 2026</div>
+
+    <div class="lead">
+      <span class="tldr">Short version:</span> Sky Mood does not collect, store, or share your personal
+      data on any server. It uses your location (or a city you search) only to look up the weather, and
+      it keeps your saved places and settings on your own device.
+    </div>
+
+    <p>This policy applies to Sky Mood in all its forms — the native apps (iOS, Android, Windows,
+       macOS) and the web edition at <a href="/">get-skymood.vercel.app</a>.</p>
+
+    <h2>What information Sky Mood uses</h2>
+    <ul>
+      <li><strong>Location</strong> — to show your <em>local</em> weather, the app uses either your
+          device's location (only if you grant permission) or a city name you type. Granting location
+          is optional; you can search a city instead.</li>
+      <li>That's it. There are <strong>no accounts</strong>, no sign-in, no names, emails, or contacts
+          collected by the app.</li>
+    </ul>
+
+    <h2>Who your location is sent to</h2>
+    <p>To turn a location into a forecast, Sky Mood makes direct API requests to these services. They
+       receive only the coordinates (or your search text) needed to answer, and Sky Mood has no account
+       with them that identifies you:</p>
+    <ul>
+      <li><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — weather
+          forecasts and city search.</li>
+      <li><a href="https://www.bigdatacloud.com" target="_blank" rel="noopener">BigDataCloud</a> —
+          reverse geocoding to turn coordinates into a place name (web edition).</li>
+    </ul>
+
+    <h2>What is stored, and where</h2>
+    <p>Only on your own device — never on a server we control:</p>
+    <ul>
+      <li>Your saved/recent places, the last weather reading (so it works offline), and your °C/°F
+          preference.</li>
+      <li>The web edition stores this in your browser's <code>localStorage</code>; the native apps use
+          local app storage. You can clear it anytime by clearing the site/app data.</li>
+    </ul>
+
+    <h2>What Sky Mood does <em>not</em> do</h2>
+    <ul>
+      <li>No advertising, no ad networks.</li>
+      <li>No analytics, tracking, or profiling.</li>
+      <li>No selling, renting, or sharing of your data.</li>
+      <li>No tracking cookies.</li>
+    </ul>
+
+    <h2>Permissions</h2>
+    <ul>
+      <li><strong>Location</strong> (optional) — used only while you're using the app, to fetch local
+          weather. Deny it and search a city instead.</li>
+      <li>On the native app, an optional <strong>ground-station folder</strong> you configure is read
+          for locally-decoded satellite weather. These are files on your own device only.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>Sky Mood is not directed to children and does not knowingly collect personal information from
+       anyone.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the “Last updated” date above will change with it.</p>
+
+    <h2>Contact</h2>
+    <p>Questions? Email <a href="mailto:samuel.banapour100@gmail.com">samuel.banapour100@gmail.com</a>.</p>
+
+    <div class="foot">© 2026 Sky Mood · <a href="/">Back to the app</a></div>
+  </div>
+</body>
+</html>

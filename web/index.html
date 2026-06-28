@@ -98,6 +98,8 @@
     align-items:center;padding:14px;background:linear-gradient(transparent,rgba(0,0,0,.18))}
   .footer button{background:var(--glass);color:#fff;border:1px solid var(--edge);border-radius:20px;
     padding:8px 16px;font-size:13px;cursor:pointer;backdrop-filter:blur(8px)}
+  .footer .plink{color:#fff;opacity:.65;font-size:12px;text-decoration:none}
+  .footer .plink:hover{opacity:1;text-decoration:underline}
   .footer .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;opacity:.85}
   .footer .pip{width:8px;height:8px;border-radius:50%;background:#5dff8f;box-shadow:0 0 8px #5dff8f;animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
@@ -178,6 +180,7 @@
   <div class="footer">
     <span class="live"><span class="pip"></span> Sky Mood · web edition</span>
     <button id="refreshBtn">↻ Refresh</button>
+    <a class="plink" href="/privacy">Privacy</a>
   </div>
 
 <script>
