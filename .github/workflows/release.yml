@@ -266,3 +266,28 @@ jobs:
           ls -la out
       - uses: actions/upload-artifact@v4
         with: { name: skymood-console, path: out/*, if-no-files-found: error }
+
+  # ----------------------------------------------------------------------------- Desktop GUI (Avalonia)
+  # Self-contained, single-file native GUI builds of SkyMood.Desktop. This is the graphical
+  # cross-platform desktop app (incl. the native Linux GUI that MAUI can't provide).
+  desktop:
+    runs-on: ubuntu-latest      # the Avalonia app cross-publishes to all desktop RIDs from one runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '${{ env.DOTNET_VERSION }}' }
+      - name: Publish self-contained GUI binaries
+        run: |
+          mkdir -p out
+          for rid in linux-x64 linux-arm64 win-x64 osx-x64 osx-arm64; do
+            echo "::group::$rid"
+            dotnet publish SkyMood.Desktop/SkyMood.Desktop.csproj -c Release -r "$rid" \
+              --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+              -o "pub/$rid"
+            if [ -f "pub/$rid/SkyMood.Desktop.exe" ]; then cp "pub/$rid/SkyMood.Desktop.exe" "out/skymood-gui-$rid.exe";
+            else cp "pub/$rid/SkyMood.Desktop" "out/skymood-gui-$rid"; fi
+            echo "::endgroup::"
+          done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: skymood-desktop-gui, path: out/*, if-no-files-found: error }

@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:SkyMood.Desktop"
+        x:Class="SkyMood.Desktop.MainWindow"
+        Title="Sky Mood" Width="440" Height="820" MinWidth="360" MinHeight="600"
+        Background="#0A1428">
+
+    <Window.Styles>
+        <Style Selector="Button.glass">
+            <Setter Property="Background" Value="#26FFFFFF" />
+            <Setter Property="BorderBrush" Value="#44FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Padding" Value="14,7" />
+        </Style>
+        <Style Selector="Button.glass:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3FFFFFFF" />
+        </Style>
+        <Style Selector="Border.tile">
+            <Setter Property="Background" Value="#22FFFFFF" />
+            <Setter Property="BorderBrush" Value="#3AFFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+    </Window.Styles>
+
+    <Grid>
+        <local:WeatherScene Name="Scene" />
+
+        <Grid Margin="18" RowDefinitions="Auto,*,Auto">
+
+            <!-- search row -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+                <TextBox Name="SearchBox" Grid.Column="0" Watermark="Search a city…"
+                         Background="#26FFFFFF" Foreground="White" BorderBrush="#44FFFFFF"
+                         CornerRadius="20" Padding="14,8" VerticalContentAlignment="Center" />
+                <Button Name="SearchBtn" Grid.Column="1" Classes="glass" Content="Search" Margin="8,0,0,0" />
+                <Button Name="LocateBtn" Grid.Column="2" Classes="glass" Content="📍" Margin="8,0,0,0" />
+
+                <Border Name="ResultsCard" Grid.Column="0" Grid.ColumnSpan="3" ZIndex="20"
+                        VerticalAlignment="Top" Margin="0,48,0,0" IsVisible="False"
+                        Background="#F00E1A30" BorderBrush="#44FFFFFF" BorderThickness="1" CornerRadius="14">
+                    <ScrollViewer MaxHeight="240">
+                        <StackPanel Name="ResultsPanel" />
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- hero -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,0,0,4">
+                    <Border Name="BadgeBorder" Background="#3FB36B" CornerRadius="9" Padding="9,3">
+                        <TextBlock Name="BadgeText" Text="LIVE" FontWeight="Bold" FontSize="11" Foreground="#06210F" />
+                    </Border>
+                    <TextBlock Name="NoteText" Text="" Foreground="#CCDCE6F5" FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <TextBlock Name="EmojiText" Text="☀️" FontSize="66" HorizontalAlignment="Center" />
+                <TextBlock Name="TempText" Text="—" FontSize="88" FontWeight="Thin" Foreground="White" HorizontalAlignment="Center" />
+                <TextBlock Name="DescText" Text="" FontSize="21" Foreground="White" HorizontalAlignment="Center" />
+                <TextBlock Name="QuipText" Text="" FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" />
+                <TextBlock Name="PlaceText" Text="" FontSize="13" Foreground="#CCDCE6F5" HorizontalAlignment="Center" Margin="0,2,0,16" />
+
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Width="384">
+                    <Border Grid.Row="0" Grid.Column="0" Classes="tile" Margin="0,0,6,6">
+                        <StackPanel><TextBlock Text="FEELS LIKE" FontSize="11" Foreground="#A0DCE6F5" /><TextBlock Name="FeelsText" Text="—" FontSize="22" Foreground="White" /></StackPanel>
+                    </Border>
+                    <Border Grid.Row="0" Grid.Column="1" Classes="tile" Margin="6,0,0,6">
+                        <StackPanel><TextBlock Text="HUMIDITY" FontSize="11" Foreground="#A0DCE6F5" /><TextBlock Name="HumText" Text="—" FontSize="22" Foreground="White" /></StackPanel>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="0" Classes="tile" Margin="0,6,6,0">
+                        <StackPanel><TextBlock Text="WIND" FontSize="11" Foreground="#A0DCE6F5" /><TextBlock Name="WindText" Text="—" FontSize="22" Foreground="White" /></StackPanel>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="1" Classes="tile" Margin="6,6,0,0">
+                        <StackPanel><TextBlock Text="HIGH / LOW" FontSize="11" Foreground="#A0DCE6F5" /><TextBlock Name="HiLoText" Text="—" FontSize="22" Foreground="White" /></StackPanel>
+                    </Border>
+                </Grid>
+
+                <TextBlock Text="SAVED PLACES" FontSize="11" Foreground="#99DCE6F5" Margin="2,16,0,6" HorizontalAlignment="Left" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Width="384">
+                    <StackPanel Name="PlacesPanel" Orientation="Horizontal" Spacing="10" />
+                </ScrollViewer>
+            </StackPanel>
+
+            <!-- footer -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,10,0,0">
+                <Button Name="RefreshBtn" Classes="glass" Content="↻ Refresh" />
+                <Button Name="UnitBtn" Classes="glass" Content="°C" Width="58" HorizontalContentAlignment="Center" />
+            </StackPanel>
+
+        </Grid>
+    </Grid>
+</Window>
