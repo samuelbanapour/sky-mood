@@ -19,6 +19,8 @@ public sealed class WeatherSceneDrawable : IDrawable
     public int RainIntensity { get; set; }    // ~0..140, from the weather code
     public int SnowIntensity { get; set; }    // ~0..100
     public double WindKph { get; set; }        // drives cloud/bird drift speed + the kite
+    public float OffsetX { get; set; }          // parallax offset from device tilt (accelerometer)
+    public float OffsetY { get; set; }
 
     float WindFactor => 1f + (float)WindKph / 40f;
 
@@ -104,6 +106,8 @@ public sealed class WeatherSceneDrawable : IDrawable
 
         DrawSky(canvas, rect);
 
+        // Parallax: the tilt offset is baked into each element's coordinates below (canvas.Translate
+        // is a no-op on the MAUI Android GraphicsView, so we shift positions directly).
         bool clearish = Kind is WeatherKind.Clear or WeatherKind.FewClouds;
         if (IsDay && clearish) { DrawSun(canvas, w, h); DrawBirds(canvas, w, h); }
         if (!IsDay)
@@ -130,7 +134,7 @@ public sealed class WeatherSceneDrawable : IDrawable
         if (IsDay && WindKph >= 22 && Kind is not WeatherKind.Storm and not WeatherKind.Fog)
             DrawKite(canvas, w, h);                                                 // a kite when it's breezy
 
-        if (Flash > 0.001f)
+        if (Flash > 0.001f)                                                         // lightning: full-screen, no parallax
         {
             canvas.FillColor = Color.FromRgba(255, 255, 255, (int)(Flash * 170));
             canvas.FillRectangle(rect);
@@ -170,7 +174,7 @@ public sealed class WeatherSceneDrawable : IDrawable
 
     void DrawSun(ICanvas canvas, float w, float h)
     {
-        float cx = w * 0.5f, cy = h * 0.18f;
+        float cx = w * 0.5f + OffsetX, cy = h * 0.18f + OffsetY;
         float r = MathF.Min(w, h) * 0.12f * (1f + 0.05f * MathF.Sin(Time * 1.6f));
         for (int i = 4; i >= 1; i--)
         {
@@ -185,7 +189,7 @@ public sealed class WeatherSceneDrawable : IDrawable
 
     void DrawMoon(ICanvas canvas, float w, float h)
     {
-        float cx = w * 0.5f, cy = h * 0.18f, r = MathF.Min(w, h) * 0.1f;
+        float cx = w * 0.5f + OffsetX, cy = h * 0.18f + OffsetY, r = MathF.Min(w, h) * 0.1f;
         canvas.FillColor = Color.FromRgba(220, 228, 255, 60);
         Circle(canvas, cx, cy, r * 1.5f);
         canvas.FillColor = Hex("#EEF1F8");
@@ -202,7 +206,7 @@ public sealed class WeatherSceneDrawable : IDrawable
             var s = _stars[i];
             float a = 0.3f + 0.7f * MathF.Abs(MathF.Sin(Time * 1.4f + s.phase));
             canvas.FillColor = Color.FromRgba(1f, 1f, 1f, a);
-            Circle(canvas, s.x * w, s.y * h, s.size);
+            Circle(canvas, s.x * w + OffsetX, s.y * h + OffsetY, s.size);
         }
     }
 
@@ -214,8 +218,8 @@ public sealed class WeatherSceneDrawable : IDrawable
         for (int i = 0; i < _birds.Length; i++)
         {
             var b = _birds[i];
-            float x = (Frac(b.phase + Time * b.speed * WindFactor) * 1.2f - 0.1f) * w;
-            float y = b.y * h + MathF.Sin(Time * 2f + b.phase * 6f) * 4f;
+            float x = (Frac(b.phase + Time * b.speed * WindFactor) * 1.2f - 0.1f) * w + OffsetX;
+            float y = b.y * h + MathF.Sin(Time * 2f + b.phase * 6f) * 4f + OffsetY;
             var p = new PathF();
             p.MoveTo(x - 2 * s, y);
             p.QuadTo(x - s, y - 1.2f * s, x, y);
@@ -232,8 +236,8 @@ public sealed class WeatherSceneDrawable : IDrawable
             float prog = Frac(Time * s.speed + s.phase);
             if (prog > 0.18f) continue;                 // brief streak, long gap
             float t = prog / 0.18f, fade = 1f - t;
-            float sx = s.x * w + t * w * 0.28f;
-            float sy = s.y * h + t * h * 0.2f;
+            float sx = s.x * w + t * w * 0.28f + OffsetX;
+            float sy = s.y * h + t * h * 0.2f + OffsetY;
             float len = w * 0.06f;
             canvas.StrokeSize = 2.4f;
             canvas.StrokeColor = Color.FromRgba(1f, 1f, 1f, fade);
@@ -253,8 +257,8 @@ public sealed class WeatherSceneDrawable : IDrawable
         for (int i = 0; i < count; i++)
         {
             var c = _clouds[i];
-            float x = (Frac(c.x + Time * c.speed * WindFactor) * 1.4f - 0.2f) * w;
-            float y = c.y * h;
+            float x = (Frac(c.x + Time * c.speed * WindFactor) * 1.4f - 0.2f) * w + OffsetX;
+            float y = c.y * h + OffsetY;
             float cw = (90f + c.scale * 150f);
             DrawCloud(canvas, x, y, cw, col);
         }
@@ -311,7 +315,7 @@ public sealed class WeatherSceneDrawable : IDrawable
 
     void DrawRainbow(ICanvas canvas, float w, float h)
     {
-        float cx = w * 0.5f, cy = h * 0.46f, r0 = MathF.Min(w, h) * 0.46f;
+        float cx = w * 0.5f + OffsetX, cy = h * 0.46f + OffsetY, r0 = MathF.Min(w, h) * 0.46f;
         Color[] cols = { Hex("#FF5E5E"), Hex("#FFB14E"), Hex("#FFE14E"), Hex("#74E07D"), Hex("#5EC8FF"), Hex("#9A7DFF") };
         canvas.StrokeSize = 6;
         for (int i = 0; i < cols.Length; i++)
@@ -325,7 +329,7 @@ public sealed class WeatherSceneDrawable : IDrawable
     void DrawKite(ICanvas canvas, float w, float h)
     {
         float sway = MathF.Sin(Time * 1.1f) * w * 0.04f;
-        float kx = w * 0.72f + sway, ky = h * 0.30f - MathF.Cos(Time * 1.1f) * h * 0.02f;
+        float kx = w * 0.72f + sway + OffsetX, ky = h * 0.30f - MathF.Cos(Time * 1.1f) * h * 0.02f + OffsetY;
         float s = MathF.Min(w, h) * 0.05f;
 
         var p = new PathF();

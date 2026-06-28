@@ -57,6 +57,7 @@ public partial class MainPage : ContentPage
         _started = true;
 
         StartAnimation();
+        StartParallax();
         BuildPlaces();
         await RefreshAsync();
 
@@ -72,6 +73,7 @@ public partial class MainPage : ContentPage
         base.OnDisappearing();
         _animTimer?.Stop();
         _refreshTimer?.Stop();
+        StopParallax();
     }
 
     // ---------------- animation ----------------
@@ -84,6 +86,8 @@ public partial class MainPage : ContentPage
         {
             _scene.Time += 0.033f;
             _scene.StepParticles(0.033f);
+            _scene.OffsetX += (_targetOX - _scene.OffsetX) * 0.1f;   // ease toward the latest tilt
+            _scene.OffsetY += (_targetOY - _scene.OffsetY) * 0.1f;
 
             // Random lightning during storms.
             if (_scene.Kind == WeatherKind.Storm)
@@ -185,6 +189,42 @@ public partial class MainPage : ContentPage
         if (tempC <= 0) pool = pool.Append("Brrr… freezing! 🥶").ToArray();
         else if (tempC >= 32) pool = pool.Append("Scorcher alert! 🥵").ToArray();
         return pool[_quipRnd.Next(pool.Length)];
+    }
+
+    // ---------------- accelerometer tilt-parallax ----------------
+
+    const float ParallaxMax = 22f;     // DIPs the scene shifts at full tilt
+    float _targetOX, _targetOY;
+
+    void StartParallax()
+    {
+        try
+        {
+            var acc = Accelerometer.Default;
+            if (acc is null || !acc.IsSupported) return;       // e.g. desktop — scene just stays centred
+            acc.ReadingChanged += OnAccel;
+            if (!acc.IsMonitoring) acc.Start(SensorSpeed.UI);
+        }
+        catch { /* sensor unavailable — ignore */ }
+    }
+
+    void StopParallax()
+    {
+        try
+        {
+            var acc = Accelerometer.Default;
+            acc.ReadingChanged -= OnAccel;
+            if (acc.IsMonitoring) acc.Stop();
+        }
+        catch { }
+    }
+
+    // Fires off the UI thread; we only set float targets that the anim timer eases toward.
+    void OnAccel(object? sender, AccelerometerChangedEventArgs e)
+    {
+        var a = e.Reading.Acceleration;                         // G units; roll → X, pitch → Y
+        _targetOX = Math.Clamp(a.X, -1f, 1f) * ParallaxMax;
+        _targetOY = Math.Clamp(a.Y, -1f, 1f) * ParallaxMax;
     }
 
     void SetBadge(DataChannel channel, string note)
