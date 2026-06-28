@@ -200,6 +200,8 @@ const GRAD={
   snow:{day:["#7a93ab","#d3e0ec"],night:["#1e2735","#3b4759"]},
 };
 const $=id=>document.getElementById(id);
+// the emoji is keyed to the condition (☀️ for "clear"); swap sun-bearing ones for a moon at night
+const emojiFor=(info,day)=>day?info.e:(info.s==="clear"||info.s==="fewclouds"?"🌙":info.s==="rain"?"🌧️":info.e);
 const LS="skymood.web";
 let state={unit:localStorage.getItem(LS+".unit")||"C",data:null,loc:null,timer:null};
 
@@ -253,7 +255,7 @@ function render(reading,badge,note){
   if(!reading){ $("note").textContent=note; $("badge").textContent=badge; $("badge").className="pill offline"; show("weather"); return; }
   const {loc,cur,daily}=reading;
   const info=WX[cur.weather_code]||WX[0]; const day=cur.is_day===1;
-  $("emoji").textContent=info.e;
+  $("emoji").textContent=emojiFor(info,day);
   $("t").textContent=toDisp(cur.temperature_2m);
   $("unit").textContent="°"+state.unit;
   $("desc").textContent=info.l+(day?"":" · night");
@@ -323,7 +325,7 @@ function buildChips(){
   wrap.classList.remove("hidden"); chips.innerHTML="";
   places.forEach(p=>{
     const c=cacheGet(p); const div=document.createElement("div"); div.className="chip";
-    const t=c?`${toDisp(c.cur.temperature_2m)}° ${(WX[c.cur.weather_code]||WX[0]).e}`:"tap to load";
+    const t=c?`${toDisp(c.cur.temperature_2m)}° ${emojiFor(WX[c.cur.weather_code]||WX[0], c.cur.is_day===1)}`:"tap to load";
     div.innerHTML=`<b>${p.name||"Place"}</b><span>${t}</span>`;
     div.onclick=()=>{state.celebrate=true;loadWeather(p);};
     chips.appendChild(div);

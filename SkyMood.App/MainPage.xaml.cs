@@ -128,7 +128,7 @@ public partial class MainPage : ContentPage
     {
         var v = r.Reading.Visual;
 
-        EmojiLabel.Text = v.Emoji;
+        EmojiLabel.Text = NightAwareEmoji(v, r.Reading.IsDay);
         TempLabel.Text = Temp(r.Reading.TempC);
         DescLabel.Text = r.Reading.IsDay ? v.Label : $"{v.Label} · night";
         QuipLabel.Text = QuipFor(v.Kind, r.Reading.TempC, r.Reading.IsDay);
@@ -146,6 +146,15 @@ public partial class MainPage : ContentPage
         _scene.SnowIntensity = v.SnowIntensity;
         _scene.WindKph = r.Reading.WindKph;
     }
+
+    // The weather emoji is keyed to the condition (☀️ for "clear"); swap the sun-bearing ones for
+    // a moon at night so we don't show a sun in the dark.
+    static string NightAwareEmoji(WeatherVisual v, bool day) => day ? v.Emoji : v.Kind switch
+    {
+        WeatherKind.Clear or WeatherKind.FewClouds => "🌙",
+        WeatherKind.Rain => "🌧️",
+        _ => v.Emoji,
+    };
 
     // ---------------- playful extras ----------------
 
