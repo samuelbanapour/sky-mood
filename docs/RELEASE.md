@@ -95,6 +95,31 @@ left manual because it needs your Partner Center Azure AD app credentials and an
 
 ---
 
+## 4. macOS → notarized .dmg
+
+The `macos-dmg` job Developer-ID-signs the Avalonia desktop app, builds a `.dmg`, and **notarizes** it
+with Apple so it opens with a normal double-click (no right-click → Open). Without the secrets it still
+produces an ad-hoc `.dmg`. Notarization **reuses your App Store Connect API key** (the same `ASC_*`
+secrets as TestFlight), so you only add the Developer ID cert.
+
+**A. Developer ID Application certificate** — in your Apple Developer account create a **Developer ID
+Application** cert (this is the *outside-the-App-Store* identity, different from the iOS Distribution
+cert). Export it as a `.p12` with a password.
+
+| Secret | Value |
+|---|---|
+| `MACOS_DEVID_CERT_P12_BASE64` | `base64 -i devid.p12` |
+| `MACOS_DEVID_CERT_PASSWORD` | the .p12 export password |
+| `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` (`security find-identity -v -p codesigning` shows it) |
+
+**B. Notarization** uses your existing `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_KEY_P8_BASE64` (the App
+Store Connect API key — *App Manager* role works). Nothing extra to add if you already set those for iOS.
+
+The result is `SkyMood-macos-arm64.dmg`, stapled so Gatekeeper accepts it offline. (Build it locally too:
+`scripts/package-macos.sh <published-dir> out.dmg`, with the same env vars exported.)
+
+---
+
 ## Cutting a release
 
 ```bash

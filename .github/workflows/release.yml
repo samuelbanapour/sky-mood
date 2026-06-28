@@ -291,3 +291,45 @@ jobs:
           ls -la out
       - uses: actions/upload-artifact@v4
         with: { name: skymood-desktop-gui, path: out/*, if-no-files-found: error }
+
+  # ----------------------------------------------------------------------------- macOS DMG (notarized)
+  # Developer-ID-signed + notarized .dmg of the Avalonia GUI, so it opens with a normal double-click.
+  # Degrades to an ad-hoc app + unsigned .dmg if the signing/notarization secrets aren't set.
+  # Secrets: MACOS_DEVID_CERT_P12_BASE64, MACOS_DEVID_CERT_PASSWORD, MACOS_SIGN_IDENTITY
+  #          + the existing ASC_KEY_ID / ASC_ISSUER_ID / ASC_API_KEY_P8_BASE64 (reused for notarytool).
+  macos-dmg:
+    runs-on: macos-15
+    env:
+      MACOS_DEVID_CERT_P12_BASE64: ${{ secrets.MACOS_DEVID_CERT_P12_BASE64 }}
+      MACOS_DEVID_CERT_PASSWORD: ${{ secrets.MACOS_DEVID_CERT_PASSWORD }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '${{ env.DOTNET_VERSION }}' }
+      - name: Import Developer ID cert + notarization key (if provided)
+        if: ${{ env.MACOS_DEVID_CERT_P12_BASE64 != '' }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"; PW=$(openssl rand -hex 12)
+          security create-keychain -p "$PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$PW" "$KEYCHAIN"
+          echo "$MACOS_DEVID_CERT_P12_BASE64" | base64 -d > "$RUNNER_TEMP/devid.p12"
+          security import "$RUNNER_TEMP/devid.p12" -k "$KEYCHAIN" -P "$MACOS_DEVID_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          if [ -n "$ASC_API_KEY_P8_BASE64" ]; then
+            echo "$ASC_API_KEY_P8_BASE64" | base64 -d > "$RUNNER_TEMP/asc.p8"
+            echo "ASC_API_KEY_P8=$RUNNER_TEMP/asc.p8" >> "$GITHUB_ENV"
+          fi
+      - name: Publish GUI + build (notarized) DMG
+        run: |
+          dotnet publish SkyMood.Desktop/SkyMood.Desktop.csproj -c Release -r osx-arm64 \
+            --self-contained true -p:PublishSingleFile=false -o pub/osx-arm64
+          mkdir -p out
+          bash scripts/package-macos.sh pub/osx-arm64 "out/SkyMood-macos-arm64.dmg"
+      - uses: actions/upload-artifact@v4
+        with: { name: skymood-macos-dmg, path: out/*.dmg, if-no-files-found: error }
