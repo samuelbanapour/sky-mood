@@ -325,11 +325,14 @@ jobs:
             echo "$ASC_API_KEY_P8_BASE64" | base64 -d > "$RUNNER_TEMP/asc.p8"
             echo "ASC_API_KEY_P8=$RUNNER_TEMP/asc.p8" >> "$GITHUB_ENV"
           fi
-      - name: Publish GUI + build (notarized) DMG
+      - name: Publish GUI + build (notarized) DMGs — Apple Silicon + Intel
         run: |
-          dotnet publish SkyMood.Desktop/SkyMood.Desktop.csproj -c Release -r osx-arm64 \
-            --self-contained true -p:PublishSingleFile=false -o pub/osx-arm64
           mkdir -p out
-          bash scripts/package-macos.sh pub/osx-arm64 "out/SkyMood-macos-arm64.dmg"
+          for rid in osx-arm64 osx-x64; do
+            arch=${rid#osx-}
+            dotnet publish SkyMood.Desktop/SkyMood.Desktop.csproj -c Release -r "$rid" \
+              --self-contained true -p:PublishSingleFile=false -o "pub/$rid"
+            bash scripts/package-macos.sh "pub/$rid" "out/SkyMood-macos-$arch.dmg"
+          done
       - uses: actions/upload-artifact@v4
         with: { name: skymood-macos-dmg, path: out/*.dmg, if-no-files-found: error }
