@@ -137,6 +137,10 @@ public partial class MainPage : ContentPage
         HumidityLabel.Text = $"{r.Reading.Humidity}%";
         WindLabel.Text = $"{Math.Round(r.Reading.WindKph)} km/h";
         HighLowLabel.Text = $"{Temp(r.Reading.HighC)} / {Temp(r.Reading.LowC)}";
+        UvLabel.Text = Math.Round(r.Reading.UvIndex).ToString();
+        UvBandLabel.Text = $"· {r.Reading.UvLabel}";
+        UvBandLabel.TextColor = UvColor(r.Reading.UvIndex);
+        BuildForecast(r.Reading);
 
         SetBadge(r.Channel, r.Note);
 
@@ -320,6 +324,36 @@ public partial class MainPage : ContentPage
         PlacesList.ItemsSource = tiles;
     }
 
+    void OnDeletePlaceClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: GeoLocation loc })
+        {
+            _weather.RemovePlace(loc);
+            BuildPlaces();
+        }
+    }
+
+    // ---------------- forecast strip ----------------
+
+    void BuildForecast(WeatherReading reading)
+    {
+        ForecastList.ItemsSource = reading.Forecast
+            .Select(d => new DayTile(
+                d.ShortDay, d.Visual.Emoji, Temp(d.HighC), Temp(d.LowC),
+                $"UV {Math.Round(d.UvIndexMax)}", UvColor(d.UvIndexMax)))
+            .ToList();
+    }
+
+    // WHO/EPA UV bands → colour, mirroring the desktop + web editions.
+    static Color UvColor(double uv) => Color.FromArgb(uv switch
+    {
+        < 3  => "#3FB36B",
+        < 6  => "#D8B13A",
+        < 8  => "#E0823A",
+        < 11 => "#D9534F",
+        _    => "#9A6BD0",
+    });
+
     // ---------------- units ----------------
 
     void ToggleUnit()
@@ -365,4 +399,7 @@ public partial class MainPage : ContentPage
 
     /// <summary>Row model for the horizontal "saved places" strip.</summary>
     public sealed record PlaceTile(GeoLocation Location, string ShortLine);
+
+    /// <summary>Cell model for the horizontal 7-day forecast strip.</summary>
+    public sealed record DayTile(string Day, string Emoji, string Hi, string Lo, string Uv, Color UvColor);
 }

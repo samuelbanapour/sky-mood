@@ -64,7 +64,7 @@
                        TextColor="{StaticResource InkSoft}" />
 
                 <!-- Stats tiles -->
-                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12"
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12"
                       Margin="0,8,0,0">
                     <Border Grid.Row="0" Grid.Column="0" StrokeShape="RoundRectangle 16"
                             Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}" Padding="16,12">
@@ -94,7 +94,46 @@
                             <Label x:Name="HighLowLabel" Text="—" FontSize="22" TextColor="{StaticResource Ink}" />
                         </VerticalStackLayout>
                     </Border>
+                    <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" StrokeShape="RoundRectangle 16"
+                            Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}" Padding="16,12">
+                        <VerticalStackLayout>
+                            <Label Text="UV INDEX" FontSize="11" TextColor="{StaticResource InkSoft}" />
+                            <HorizontalStackLayout Spacing="8">
+                                <Label x:Name="UvLabel" Text="—" FontSize="22" TextColor="{StaticResource Ink}" />
+                                <Label x:Name="UvBandLabel" Text="" FontSize="13" FontAttributes="Bold"
+                                       VerticalOptions="End" Margin="0,0,0,4" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
                 </Grid>
+
+                <!-- 7-day forecast -->
+                <Label Text="7-DAY FORECAST" FontSize="11" TextColor="{StaticResource InkSoft}" Margin="2,10,0,0" />
+                <CollectionView x:Name="ForecastList" HeightRequest="118">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border StrokeShape="RoundRectangle 14" Stroke="{StaticResource GlassEdge}"
+                                    BackgroundColor="{StaticResource Glass}" Padding="10,10" WidthRequest="62">
+                                <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                                    <Label Text="{Binding Day}" FontSize="11" FontAttributes="Bold"
+                                           TextColor="{StaticResource Ink}" HorizontalOptions="Center" />
+                                    <Label Text="{Binding Emoji}" FontSize="22" HorizontalOptions="Center" />
+                                    <Label Text="{Binding Hi}" FontSize="14" FontAttributes="Bold"
+                                           TextColor="{StaticResource Ink}" HorizontalOptions="Center" />
+                                    <Label Text="{Binding Lo}" FontSize="12"
+                                           TextColor="{StaticResource InkSoft}" HorizontalOptions="Center" />
+                                    <Border StrokeShape="RoundRectangle 6" StrokeThickness="0"
+                                            BackgroundColor="{Binding UvColor}" Padding="5,1" HorizontalOptions="Center">
+                                        <Label Text="{Binding Uv}" FontSize="9" FontAttributes="Bold" TextColor="#0C1322" />
+                                    </Border>
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
 
                 <!-- Saved places (also your offline list) -->
                 <Label Text="SAVED PLACES" FontSize="11" TextColor="{StaticResource InkSoft}" Margin="2,10,0,0" />
@@ -106,10 +145,16 @@
                         <DataTemplate>
                             <Border StrokeShape="RoundRectangle 14" Stroke="{StaticResource GlassEdge}"
                                     BackgroundColor="{StaticResource Glass}" Padding="14,8">
-                                <VerticalStackLayout VerticalOptions="Center">
-                                    <Label Text="{Binding Location.Name}" TextColor="{StaticResource Ink}" FontSize="14" />
-                                    <Label Text="{Binding ShortLine}" TextColor="{StaticResource InkSoft}" FontSize="12" />
-                                </VerticalStackLayout>
+                                <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
+                                        <Label Text="{Binding Location.Name}" TextColor="{StaticResource Ink}" FontSize="14" />
+                                        <Label Text="{Binding ShortLine}" TextColor="{StaticResource InkSoft}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="1" Text="✕" FontSize="12" WidthRequest="26" HeightRequest="26"
+                                            Padding="0" CornerRadius="13" VerticalOptions="Center"
+                                            BackgroundColor="#33000000" TextColor="{StaticResource Ink}"
+                                            Clicked="OnDeletePlaceClicked" CommandParameter="{Binding Location}" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
