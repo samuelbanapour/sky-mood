@@ -13,7 +13,7 @@ iOS/macOS stay direct-download).
 | Package | Identity | Version | Signing | Verdict |
 |---|---|---|---|---|
 | `SkyMood-0.1.6-upload.aab` (Play) | `com.gamedevsolo.skymood`, minSdk 24 / targetSdk 36, ABIs arm64-v8a + armeabi-v7a + x86_64 | versionCode **1**, versionName **1.0** | signed V3, upload key `CN=Sky Mood, O=GameDevSolo, C=US` (`jar verified`) | ✅ uploadable |
-| `SkyMood.App_1.0.0.0_x64.msix` (Store) | `Name=com.gamedevsolo.skymood`, `Publisher=CN=GameDevSolo`, x64 only | `1.0.0.0` | **unsigned** | ⚠️ identity must be swapped — see §1 |
+| `SkyMood.App_1.0.0.0_x64.msix` (Store) | old placeholder identity, x64 only | `1.0.0.0` | **unsigned** | ⚠️ stale — manifest now fixed (§1); **rebuild** to regenerate |
 
 Upload-key SHA-256 (register under Play App Signing): `ee71c8d414356f020d7b364a26704e0c50de4642bfb8bb8efc8f80e224fedd5f`
 
@@ -26,22 +26,29 @@ Two things to know before uploading:
 
 ---
 
-## 1. ⚠️ Required fix before Microsoft Store will accept the MSIX
+## 1. ✅ Store identity (applied) — rebuild required
 
-The Store rejects a package whose identity doesn't match the one Partner Center reserves for you.
-After you **reserve the app name** in Partner Center, open
-**Product → Product identity** and copy the three assigned values into
+The Store rejects a package whose identity doesn't match the one Partner Center reserved. The app
+**Sky Mood** is reserved (Store ID `9P9HG0ZLZ992`,
+<https://apps.microsoft.com/detail/9P9HG0ZLZ992>) and its assigned identity is now baked into
 [`SkyMood.App/Platforms/Windows/Package.appxmanifest`](../SkyMood.App/Platforms/Windows/Package.appxmanifest):
 
-| Manifest field (current placeholder) | Replace with Partner Center value |
+| Manifest field | Value (from Partner Center) |
 |---|---|
-| `<Identity Name="com.gamedevsolo.skymood" …>` | **Package/Identity/Name** (e.g. `12345GameDevSolo.SkyMood`) |
-| `<Identity Publisher="CN=GameDevSolo" …>` | **Package/Identity/Publisher** (e.g. `CN=ABCD1234-…`) |
-| `<PublisherDisplayName>GameDevSolo</…>` | **Package/Properties/PublisherDisplayName** |
+| `Package/Identity/Name` | `GameDevs.SkyMood` |
+| `Package/Identity/Publisher` | `CN=AB578A7A-AB77-4581-85A4-109FDE76C7BE` |
+| `Package/Properties/PublisherDisplayName` | `Game Devs` |
+| Package Family Name | `GameDevs.SkyMood_t3tywrrzytdmj` |
 
-Then rebuild the Windows package (Release, `-p:Heads=windows`) — or set `WindowsPackageType=Msix`
-and let `release.yml` produce the `.msix`/`.msixupload` — and upload **that** to the submission.
-Leave it unsigned; the Store signs it.
+**Now rebuild** so the `dist/` MSIX carries the new identity (the existing one in `dist/` still has
+the old placeholder and would be rejected):
+
+```bash
+dotnet build SkyMood.App/SkyMood.App.csproj -c Release -p:Heads=windows -p:WindowsPackageType=Msix
+```
+
+Upload that `.msix` (or `.msixupload`) **unsigned** — the Store signs it. (A self-signed sideload
+build would now need a cert whose subject is `CN=AB578A7A-…`, but you don't need that for the Store.)
 
 > Tip: a `.msixupload` (or `.msixbundle`) covering **x64 + arm64** widens device reach. The current
 > package is x64-only, which is acceptable but excludes Arm Windows devices.

@@ -5,13 +5,15 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="com.gamedevsolo.skymood"
-            Publisher="CN=GameDevSolo"
+  <!-- Identity assigned by Microsoft Partner Center (Product → Product identity).
+       Must match exactly or the Store rejects the upload. Store ID: 9P9HG0ZLZ992 -->
+  <Identity Name="GameDevs.SkyMood"
+            Publisher="CN=AB578A7A-AB77-4581-85A4-109FDE76C7BE"
             Version="1.0.0.0" />
 
   <Properties>
     <DisplayName>Sky Mood</DisplayName>
-    <PublisherDisplayName>GameDevSolo</PublisherDisplayName>
+    <PublisherDisplayName>Game Devs</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 
