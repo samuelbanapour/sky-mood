@@ -25,6 +25,8 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.2.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.1" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.1" />
+    <!-- Override Avalonia's transitive 0.20.0 (GHSA-xrw6-gwf8-vvr9, signal spoofing); 0.21.3 is the backported patch. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
 
   <ItemGroup>
