@@ -1,5 +1,16 @@
 <Project>
 
+  <!-- Publisher / product metadata, embedded into every assembly (AssemblyCompany,
+       AssemblyCopyright, …). Central so all heads stay consistent. The app/bundle ids
+       (com.gamedevsolo.skymood) are deliberately NOT changed — they're registered store
+       identities and renaming them would orphan the Play/Microsoft Store registrations. -->
+  <PropertyGroup>
+    <Company>Solo Apps Studio</Company>
+    <Authors>Solo Apps Studio</Authors>
+    <Product>Sky Mood</Product>
+    <Copyright>© 2026 Solo Apps Studio</Copyright>
+  </PropertyGroup>
+
   <!-- Build output goes to the internal APFS disk. This repo lives on an exFAT volume that
        creates macOS AppleDouble dot-underscore (._*) sidecar files; the Android/iOS toolchains
        generate intermediates whose sidecars then break javac / codesign. APFS never creates them.

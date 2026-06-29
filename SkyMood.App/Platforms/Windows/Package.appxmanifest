@@ -14,7 +14,7 @@
   <Properties>
     <DisplayName>Sky Mood</DisplayName>
     <!-- Must EXACTLY match the publisher display name in Partner Center (Account settings). -->
-    <PublisherDisplayName>Solo Apps</PublisherDisplayName>
+    <PublisherDisplayName>Solo Apps Studio</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 

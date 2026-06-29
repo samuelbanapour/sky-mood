@@ -37,15 +37,14 @@ The Store rejects a package whose identity doesn't match the one Partner Center 
 |---|---|
 | `Package/Identity/Name` | `GameDevs.SkyMood` |
 | `Package/Identity/Publisher` | `CN=AB578A7A-AB77-4581-85A4-109FDE76C7BE` |
-| `Package/Properties/PublisherDisplayName` | `Solo Apps` — see note below |
+| `Package/Properties/PublisherDisplayName` | `Solo Apps Studio` |
 | Package Family Name | `GameDevs.SkyMood_t3tywrrzytdmj` |
 
-> **Publisher rename (Game Devs → Solo Apps):** the manifest `PublisherDisplayName` must match the
-> Partner Center publisher display name *exactly*. Change it in **Partner Center → Account settings →
-> publisher display name** to `Solo Apps` (must be unique; may need a short Microsoft review), then
-> upload. The `Publisher` GUID and the reserved Identity `Name` (`GameDevs.SkyMood`) are unaffected —
-> only the display name changes. If `Solo Apps` is taken or the change is blocked, pick another and
-> update this one line to match.
+> **Publisher display name is `Solo Apps Studio`** (renamed in Partner Center from "Game Devs").
+> The manifest `PublisherDisplayName` must match it *exactly* — already set. The `Publisher` GUID and
+> the reserved Identity `Name` (`GameDevs.SkyMood`) are account-tied and unaffected. The app/bundle id
+> `com.gamedevsolo.skymood` is also intentionally unchanged (renaming it would orphan the reserved
+> Play/Store registrations).
 
 **Now rebuild** so the `dist/` MSIX carries the new identity (the existing one in `dist/` still has
 the old placeholder and would be rejected):

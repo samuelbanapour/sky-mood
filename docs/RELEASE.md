@@ -79,7 +79,7 @@ For **sideload/Store** signing, supply a code-signing certificate (`.pfx`). For 
 a self-signed one:
 
 ```powershell
-$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=GameDevSolo" `
+$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Solo Apps Studio" `
   -CertStoreLocation Cert:\CurrentUser\My
 Export-PfxCertificate -Cert $cert -FilePath skymood.pfx -Password (ConvertTo-SecureString -String "PFXPASS" -AsPlainText -Force)
 ```
