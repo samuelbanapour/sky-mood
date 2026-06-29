@@ -212,6 +212,10 @@ public partial class MainWindow : Window
     void BuildForecast(WeatherReading reading)
     {
         ForecastPanel.Children.Clear();
+        // Older offline-cached readings have no daily block — hide the section rather than show an empty strip.
+        bool has = reading.Forecast.Count > 0;
+        ForecastHeader.IsVisible = has;
+        ForecastScroller.IsVisible = has;
         foreach (var d in reading.Forecast)
         {
             var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Spacing = 2 };

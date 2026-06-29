@@ -87,8 +87,8 @@
                     </Border>
                 </Grid>
 
-                <TextBlock Text="7-DAY FORECAST" FontSize="11" Foreground="#99DCE6F5" Margin="2,16,0,6" HorizontalAlignment="Left" />
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Width="384">
+                <TextBlock Name="ForecastHeader" Text="7-DAY FORECAST" FontSize="11" Foreground="#99DCE6F5" Margin="2,16,0,6" HorizontalAlignment="Left" />
+                <ScrollViewer Name="ForecastScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Width="384">
                     <StackPanel Name="ForecastPanel" Orientation="Horizontal" Spacing="8" />
                 </ScrollViewer>
 

@@ -108,7 +108,7 @@
                 </Grid>
 
                 <!-- 7-day forecast -->
-                <Label Text="7-DAY FORECAST" FontSize="11" TextColor="{StaticResource InkSoft}" Margin="2,10,0,0" />
+                <Label x:Name="ForecastHeader" Text="7-DAY FORECAST" FontSize="11" TextColor="{StaticResource InkSoft}" Margin="2,10,0,0" />
                 <CollectionView x:Name="ForecastList" HeightRequest="118">
                     <CollectionView.ItemsLayout>
                         <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />

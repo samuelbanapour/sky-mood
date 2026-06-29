@@ -342,6 +342,10 @@ public partial class MainPage : ContentPage
                 d.ShortDay, d.Visual.Emoji, Temp(d.HighC), Temp(d.LowC),
                 $"UV {Math.Round(d.UvIndexMax)}", UvColor(d.UvIndexMax)))
             .ToList();
+        // Older offline-cached readings have no daily block — hide the section rather than show an empty strip.
+        bool has = reading.Forecast.Count > 0;
+        ForecastHeader.IsVisible = has;
+        ForecastList.IsVisible = has;
     }
 
     // WHO/EPA UV bands → colour, mirroring the desktop + web editions.

@@ -278,7 +278,7 @@ async function loadWeather(loc){
 
 // ---------- render ----------
 function render(reading,badge,note){
-  if(!reading){ $("note").textContent=note; $("badge").textContent=badge; $("badge").className="pill offline"; show("weather"); return; }
+  if(!reading){ $("note").textContent=note; $("badge").textContent=badge; $("badge").className="pill offline"; $("forecastWrap").classList.add("hidden"); show("weather"); return; }
   const {loc,cur,daily}=reading;
   const info=WX[cur.weather_code]||WX[0]; const day=cur.is_day===1;
   $("emoji").textContent=emojiFor(info,day);
