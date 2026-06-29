@@ -13,7 +13,8 @@
 
   <Properties>
     <DisplayName>Sky Mood</DisplayName>
-    <PublisherDisplayName>Game Devs</PublisherDisplayName>
+    <!-- Must EXACTLY match the publisher display name in Partner Center (Account settings). -->
+    <PublisherDisplayName>Solo Apps</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 
