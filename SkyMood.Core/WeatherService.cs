@@ -67,6 +67,9 @@ public sealed class WeatherService
 
     public IReadOnlyList<WeatherResult> CachedPlaces() => _cache.All();
 
+    /// <summary>Forget a saved place so it drops off the offline list. True if it existed.</summary>
+    public bool RemovePlace(GeoLocation location) => _cache.Remove(location);
+
     static string NoteFor(DataChannel channel, WeatherReading r) => channel switch
     {
         DataChannel.Satellite => $"Direct satellite pass · {Humanize(DateTimeOffset.Now - r.ObservedAt)} ago",

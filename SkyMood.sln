@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SkyMood.App", "SkyMood.App\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyMood.Desktop", "SkyMood.Desktop\SkyMood.Desktop.csproj", "{72DC4F5E-CC95-49B6-B1F5-038823324250}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyMood.Core.Tests", "SkyMood.Core.Tests\SkyMood.Core.Tests.csproj", "{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{72DC4F5E-CC95-49B6-B1F5-038823324250}.Release|x64.Build.0 = Release|Any CPU
 		{72DC4F5E-CC95-49B6-B1F5-038823324250}.Release|x86.ActiveCfg = Release|Any CPU
 		{72DC4F5E-CC95-49B6-B1F5-038823324250}.Release|x86.Build.0 = Release|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Debug|x64.Build.0 = Debug|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Debug|x86.Build.0 = Debug|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Release|x64.ActiveCfg = Release|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Release|x64.Build.0 = Release|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Release|x86.ActiveCfg = Release|Any CPU
+		{5DD2BE5C-5DAE-490F-8672-1CFC1B112099}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

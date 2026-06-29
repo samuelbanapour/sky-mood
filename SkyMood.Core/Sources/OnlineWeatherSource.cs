@@ -30,8 +30,9 @@ public sealed class OnlineWeatherSource : IWeatherSource
         var lon = location.Longitude.ToString("0.####", CultureInfo.InvariantCulture);
         var url =
             $"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}" +
-            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m" +
-            "&daily=temperature_2m_max,temperature_2m_min&timezone=auto";
+            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,uv_index" +
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,uv_index_max" +
+            "&forecast_days=7&timezone=auto";
 
         // One immediate retry smooths over the occasional dropped packet on a satellite hop.
         for (int attempt = 0; attempt < 2; attempt++)
@@ -62,6 +63,8 @@ public sealed class OnlineWeatherSource : IWeatherSource
             e.TryGetProperty(p, out var arr) && arr.ValueKind == JsonValueKind.Array && arr.GetArrayLength() > 0
                 ? arr[0].GetDouble() : 0;
 
+        var forecast = ParseDaily(daily);
+
         return new WeatherReading(
             TempC: Num(cur, "temperature_2m"),
             FeelsLikeC: Num(cur, "apparent_temperature"),
@@ -71,6 +74,37 @@ public sealed class OnlineWeatherSource : IWeatherSource
             IsDay: Num(cur, "is_day") == 1,
             HighC: First(daily, "temperature_2m_max"),
             LowC: First(daily, "temperature_2m_min"),
-            ObservedAt: DateTimeOffset.Now);
+            ObservedAt: DateTimeOffset.Now,
+            UvIndex: Num(cur, "uv_index"),
+            Daily: forecast);
+    }
+
+    /// <summary>Builds the multi-day outlook from the parallel arrays Open-Meteo returns under "daily".</summary>
+    static IReadOnlyList<DailyForecast> ParseDaily(JsonElement daily)
+    {
+        if (daily.ValueKind != JsonValueKind.Object
+            || !daily.TryGetProperty("time", out var time)
+            || time.ValueKind != JsonValueKind.Array)
+            return Array.Empty<DailyForecast>();
+
+        JsonElement Arr(string p) =>
+            daily.TryGetProperty(p, out var a) && a.ValueKind == JsonValueKind.Array ? a : default;
+
+        var codes = Arr("weather_code");
+        var highs = Arr("temperature_2m_max");
+        var lows  = Arr("temperature_2m_min");
+        var uvs   = Arr("uv_index_max");
+
+        double At(JsonElement arr, int i) =>
+            arr.ValueKind == JsonValueKind.Array && i < arr.GetArrayLength() ? arr[i].GetDouble() : 0;
+
+        var list = new List<DailyForecast>(time.GetArrayLength());
+        for (int i = 0; i < time.GetArrayLength(); i++)
+        {
+            var date = DateOnly.TryParse(time[i].GetString(), CultureInfo.InvariantCulture, out var d)
+                ? d : DateOnly.FromDateTime(DateTime.Now).AddDays(i);
+            list.Add(new DailyForecast(date, At(highs, i), At(lows, i), (int)At(codes, i), At(uvs, i)));
+        }
+        return list;
     }
 }

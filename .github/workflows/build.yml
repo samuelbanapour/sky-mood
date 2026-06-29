@@ -19,6 +19,19 @@ env:
   APP: SkyMood.App/SkyMood.App.csproj
 
 jobs:
+  # Fast gate: Core has no MAUI/Xcode dependency, so it builds + tests on a plain Linux runner
+  # in seconds. Runs first and in parallel with the heavier platform builds.
+  tests:
+    name: Core unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Test SkyMood.Core
+        run: dotnet test SkyMood.Core.Tests/SkyMood.Core.Tests.csproj -c "$BUILD_CONFIG" --logger "console;verbosity=normal"
+
   android:
     name: Android (APK)
     runs-on: ubuntu-latest

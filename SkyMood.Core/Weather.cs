@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace SkyMood;
 
 /// <summary>A place we can show weather for. Latitude/Longitude in degrees.</summary>
@@ -39,11 +41,47 @@ public sealed record WeatherReading(
     bool IsDay,
     double HighC,
     double LowC,
-    DateTimeOffset ObservedAt)
+    DateTimeOffset ObservedAt,
+    // Added later — defaulted so old cached JSON (without these) still deserializes.
+    double UvIndex = 0,
+    IReadOnlyList<DailyForecast>? Daily = null)
 {
     public WeatherVisual Visual => WeatherCodes.Describe(WeatherCode);
 
+    /// <summary>The multi-day outlook, never null (empty when a source didn't supply one).</summary>
+    public IReadOnlyList<DailyForecast> Forecast => Daily ?? Array.Empty<DailyForecast>();
+
+    /// <summary>WHO/EPA UV exposure band for the current UV index.</summary>
+    public string UvLabel => UvCategory(UvIndex);
+
     public static double ToFahrenheit(double c) => c * 9.0 / 5.0 + 32.0;
+
+    /// <summary>Standard UV-index risk band: Low / Moderate / High / Very High / Extreme.</summary>
+    public static string UvCategory(double uv) => uv switch
+    {
+        < 3  => "Low",
+        < 6  => "Moderate",
+        < 8  => "High",
+        < 11 => "Very High",
+        _    => "Extreme",
+    };
+}
+
+/// <summary>One day in the multi-day outlook. Temperatures in °C.</summary>
+public sealed record DailyForecast(
+    DateOnly Date,
+    double HighC,
+    double LowC,
+    int WeatherCode,
+    double UvIndexMax)
+{
+    public WeatherVisual Visual => WeatherCodes.Describe(WeatherCode);
+
+    /// <summary>Short weekday label for the UI, e.g. "Mon" (today reads "Today").</summary>
+    public string ShortDay =>
+        Date == DateOnly.FromDateTime(DateTime.Now)
+            ? "Today"
+            : Date.ToString("ddd", CultureInfo.InvariantCulture);
 }
 
 /// <summary>Where a reading came from. Drives the "Live / Satellite / Offline" badge in the UI.</summary>

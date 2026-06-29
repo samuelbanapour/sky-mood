@@ -42,6 +42,19 @@ public sealed class OfflineCache
         catch { return null; }
     }
 
+    /// <summary>Forget a saved place. Returns true if a cache entry existed and was deleted.</summary>
+    public bool Remove(GeoLocation location)
+    {
+        try
+        {
+            var path = PathFor(location);
+            if (!File.Exists(path)) return false;
+            File.Delete(path);
+            return true;
+        }
+        catch { return false; }
+    }
+
     /// <summary>All cached places, newest reading first — used to populate the offline places list.</summary>
     public IReadOnlyList<WeatherResult> All()
     {
