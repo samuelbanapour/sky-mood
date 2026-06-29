@@ -8,12 +8,17 @@
     <RootNamespace>SkyMood.Desktop</RootNamespace>
     <AssemblyName>SkyMood.Desktop</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/skymood.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- This volume creates macOS AppleDouble (._*) sidecar files; keep them out of the build. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);._*;**/._*</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" Exclude="Assets/**/._*;Assets/._*" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.1" />

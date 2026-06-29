@@ -49,7 +49,7 @@
 
   <ItemGroup>
     <!-- App icon + splash (generated from SVG by the MAUI build) -->
-    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0A1428" />
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0E1C3A" />
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0A1428" BaseSize="128,128" />
   </ItemGroup>
 

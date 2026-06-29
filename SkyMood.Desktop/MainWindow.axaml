@@ -3,7 +3,7 @@
         xmlns:local="clr-namespace:SkyMood.Desktop"
         x:Class="SkyMood.Desktop.MainWindow"
         Title="Sky Mood" Width="440" Height="820" MinWidth="360" MinHeight="600"
-        Background="#0A1428">
+        Icon="/Assets/skymood.ico" Background="#0A1428">
 
     <Window.Styles>
         <Style Selector="Button.glass">
