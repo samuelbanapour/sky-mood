@@ -16,6 +16,8 @@ WORK="$(mktemp -d)"; APP="$WORK/SkyMood.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp -R "$PUBDIR"/. "$APP/Contents/MacOS/"
 chmod +x "$APP/Contents/MacOS/SkyMood.Desktop"
+ICNS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../SkyMood.Desktop/Assets/SkyMood.icns"
+[ -f "$ICNS" ] && cp "$ICNS" "$APP/Contents/Resources/SkyMood.icns"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -25,6 +27,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleDisplayName</key><string>Sky Mood</string>
   <key>CFBundleIdentifier</key><string>com.gamedevsolo.skymood.desktop</string>
   <key>CFBundleExecutable</key><string>SkyMood.Desktop</string>
+  <key>CFBundleIconFile</key><string>SkyMood</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>

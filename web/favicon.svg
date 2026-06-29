@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0E1C3A"/>
+      <stop offset="1" stop-color="#1E406E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <!-- sun rays (lower ones are covered by the cloud) -->
+  <g stroke="#FFCE54" stroke-width="26" stroke-linecap="round">
+    <line x1="625" y1="410" x2="712" y2="410"/>
+    <line x1="596" y1="518" x2="672" y2="561"/>
+    <line x1="518" y1="596" x2="561" y2="672"/>
+    <line x1="410" y1="625" x2="410" y2="712"/>
+    <line x1="302" y1="596" x2="259" y2="672"/>
+    <line x1="224" y1="518" x2="148" y2="561"/>
+    <line x1="195" y1="410" x2="108" y2="410"/>
+    <line x1="224" y1="302" x2="148" y2="259"/>
+    <line x1="302" y1="224" x2="259" y2="148"/>
+    <line x1="410" y1="195" x2="410" y2="108"/>
+    <line x1="518" y1="224" x2="561" y2="148"/>
+    <line x1="596" y1="302" x2="672" y2="259"/>
+  </g>
+  <!-- sun -->
+  <circle cx="410" cy="410" r="159" fill="#FFC847"/>
+  <circle cx="410" cy="410" r="118" fill="#FFE278"/>
+  <!-- cloud -->
+  <g fill="#FFFFFF">
+    <circle cx="410" cy="615" r="118"/>
+    <circle cx="573" cy="563" r="148"/>
+    <circle cx="707" cy="625" r="107"/>
+    <rect x="266" y="676" width="532" height="138" rx="69"/>
+  </g>
+</svg>
