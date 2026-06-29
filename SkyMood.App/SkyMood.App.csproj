@@ -38,6 +38,12 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 
+    <!-- Publisher: the Android head ships under the Play Store identity "Game Dev Solo".
+         Every other head inherits "Solo Apps Studio" from Directory.Build.props. -->
+    <Company Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">Game Dev Solo</Company>
+    <Authors Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">Game Dev Solo</Authors>
+    <Copyright Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">© 2026 Game Dev Solo</Copyright>
+
     <!-- Support every real Android ABI: armeabi-v7a (32-bit — older Fire tablets/phones),
          arm64-v8a (modern devices) and x86_64 (emulators). Without armeabi-v7a, install fails with
          NO_MATCHING_ABIS on 32-bit devices and Play won't serve them. Android head only, so it

@@ -19,7 +19,7 @@ keytool -genkeypair -v \
   -keystore "$OUT" -alias "$ALIAS" \
   -keyalg RSA -keysize 2048 -validity 10000 \
   -storepass "$STOREPASS" -keypass "$KEYPASS" \
-  -dname "CN=Sky Mood, OU=Solo Apps Studio, O=Solo Apps Studio, C=US"
+  -dname "CN=Sky Mood, OU=Game Dev Solo, O=Game Dev Solo, C=US"
 
 echo
 echo "Created $OUT (alias: $ALIAS)."
