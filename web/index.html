@@ -474,7 +474,15 @@ function setParallax(nx,ny){_px=nx*16;_py=ny*16;if(!_raf)_loop();}
 addEventListener("mousemove",e=>setParallax(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5));
 addEventListener("deviceorientation",e=>{if(e.gamma!=null)setParallax(Math.max(-1,Math.min(1,e.gamma/45)),Math.max(-1,Math.min(1,((e.beta||45)-45)/45)));});
 
-function boot(){ buildChips(); useGeo(false); }
+function boot(){
+  buildChips();
+  // Shareable deep links: ?q=City or ?lat=..&lon=..&name=.. open straight to that place.
+  const p=new URLSearchParams(location.search);
+  const q=p.get("q"), lat=p.get("lat"), lon=p.get("lon");
+  if(lat&&lon){ loadWeather({name:p.get("name")||"",admin:"",country:p.get("country")||"",lat:+lat,lon:+lon}); return; }
+  if(q){ geocode(q).then(r=>{ if(r[0]) loadWeather(r[0]); else useGeo(false); }); return; }
+  useGeo(false);
+}
 boot();
 </script>
 </body>
