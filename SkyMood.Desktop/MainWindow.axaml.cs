@@ -93,7 +93,11 @@ public partial class MainWindow : Window
         HumText.Text = $"{r.Reading.Humidity}%";
         WindText.Text = $"{Math.Round(r.Reading.WindKph)} km/h";
         HiLoText.Text = $"{Temp(r.Reading.HighC)} / {Temp(r.Reading.LowC)}";
+        UvText.Text = Math.Round(r.Reading.UvIndex).ToString(CultureInfo.InvariantCulture);
+        UvBand.Text = $"· {r.Reading.UvLabel}";
+        UvBand.Foreground = new SolidColorBrush(Color.Parse(UvColor(r.Reading.UvIndex)));
         SetBadge(r.Channel, r.Note);
+        BuildForecast(r.Reading);
 
         Scene.Kind = v.Kind;
         Scene.IsDay = r.Reading.IsDay;
@@ -173,7 +177,7 @@ public partial class MainWindow : Window
         foreach (var r in _weather.CachedPlaces())
         {
             var stack = new StackPanel();
-            stack.Children.Add(new TextBlock { Text = r.Location.Name, Foreground = Brushes.White, FontSize = 14 });
+            stack.Children.Add(new TextBlock { Text = r.Location.Name, Foreground = Brushes.White, FontSize = 14, Margin = new Thickness(0, 0, 14, 0) });
             stack.Children.Add(new TextBlock { Text = $"{Temp(r.Reading.TempC)}  {r.Reading.Visual.Label}", Foreground = new SolidColorBrush(Color.Parse("#CCDCE6F5")), FontSize = 12 });
             var tile = new Button
             {
@@ -183,9 +187,65 @@ public partial class MainWindow : Window
             };
             var place = r.Location;
             tile.Click += async (_, _) => { _celebrate = true; await SetLocation(place); };
-            PlacesPanel.Children.Add(tile);
+
+            // small ✕ to forget this place, overlaid top-right of the tile
+            var del = new Button
+            {
+                Content = "✕", FontSize = 11, Foreground = Brushes.White, Padding = new Thickness(0),
+                Width = 18, Height = 18, CornerRadius = new CornerRadius(9),
+                Background = new SolidColorBrush(Color.FromArgb(0x40, 0, 0, 0)), BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 4, 4, 0), HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+            };
+            del.Click += (_, _) => { _weather.RemovePlace(place); BuildPlaces(); };
+
+            var cell = new Grid();
+            cell.Children.Add(tile);
+            cell.Children.Add(del);
+            PlacesPanel.Children.Add(cell);
         }
     }
+
+    // ---------------- forecast ----------------
+
+    void BuildForecast(WeatherReading reading)
+    {
+        ForecastPanel.Children.Clear();
+        foreach (var d in reading.Forecast)
+        {
+            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Spacing = 2 };
+            stack.Children.Add(new TextBlock { Text = d.ShortDay, FontSize = 11, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.Parse("#D8DCE6F5")), HorizontalAlignment = HorizontalAlignment.Center });
+            stack.Children.Add(new TextBlock { Text = d.Visual.Emoji, FontSize = 22, HorizontalAlignment = HorizontalAlignment.Center });
+            stack.Children.Add(new TextBlock { Text = Temp(d.HighC), FontSize = 14, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center });
+            stack.Children.Add(new TextBlock { Text = Temp(d.LowC), FontSize = 12, Foreground = new SolidColorBrush(Color.Parse("#99DCE6F5")), HorizontalAlignment = HorizontalAlignment.Center });
+
+            var uvTag = new Border
+            {
+                Background = new SolidColorBrush(Color.Parse(UvColor(d.UvIndexMax))), CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(5, 1), Margin = new Thickness(0, 2, 0, 0),
+                Child = new TextBlock { Text = $"UV {Math.Round(d.UvIndexMax)}", FontSize = 9, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.Parse("#0C1322")) },
+            };
+            stack.Children.Add(uvTag);
+
+            ForecastPanel.Children.Add(new Border
+            {
+                Child = stack, Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(0x3A, 255, 255, 255)), BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(14), Padding = new Thickness(10, 10), MinWidth = 60,
+            });
+        }
+    }
+
+    // WHO/EPA UV bands → colour, mirroring the web edition and WeatherReading.UvCategory.
+    static string UvColor(double uv) => uv switch
+    {
+        < 3  => "#3FB36B",
+        < 6  => "#D8B13A",
+        < 8  => "#E0823A",
+        < 11 => "#D9534F",
+        _    => "#9A6BD0",
+    };
 
     // ---------------- units ----------------
 
