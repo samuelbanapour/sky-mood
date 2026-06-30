@@ -215,24 +215,32 @@ jobs:
         with: { dotnet-version: '${{ env.DOTNET_VERSION }}' }
       - run: dotnet workload install maui-windows
 
-      - name: Build MSIX
+      - name: Build MSIX (x64 + ARM64)
         run: |
-          common=(-c Release -p:Heads=windows -f net10.0-windows10.0.19041.0
-                  -p:RuntimeIdentifierOverride=win10-x64
-                  -p:GenerateAppxPackageOnBuild=true
-                  -p:AppxPackageDir=msix/
-                  -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
-                  -p:ApplicationVersion=${{ needs.version.outputs.build }})
-          if [ -n "$WINDOWS_PFX_BASE64" ]; then
-            echo "$WINDOWS_PFX_BASE64" | base64 -d > cert.pfx
-            dotnet publish "$APP" "${common[@]}" \
-              -p:AppxPackageSigningEnabled=true \
-              -p:PackageCertificateKeyFile=cert.pfx \
-              -p:PackageCertificatePassword="$WINDOWS_PFX_PASSWORD"
-          else
-            echo "No WINDOWS_PFX_BASE64 — building an unsigned MSIX for verification."
-            dotnet publish "$APP" "${common[@]}" -p:AppxPackageSigningEnabled=false
-          fi
+          # Build an MSIX per architecture so the Store can serve both Intel/AMD (x64)
+          # and ARM64 Windows PCs. Unsigned is fine for the Store (Microsoft signs it);
+          # a PFX is only needed for sideloading.
+          build_msix() {
+            local rid="$1"
+            local common=(-c Release -p:Heads=windows -f net10.0-windows10.0.19041.0
+                    -p:RuntimeIdentifierOverride="$rid"
+                    -p:GenerateAppxPackageOnBuild=true
+                    -p:AppxPackageDir=msix/
+                    -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
+                    -p:ApplicationVersion=${{ needs.version.outputs.build }})
+            if [ -n "$WINDOWS_PFX_BASE64" ]; then
+              echo "$WINDOWS_PFX_BASE64" | base64 -d > cert.pfx
+              dotnet publish "$APP" "${common[@]}" \
+                -p:AppxPackageSigningEnabled=true \
+                -p:PackageCertificateKeyFile=cert.pfx \
+                -p:PackageCertificatePassword="$WINDOWS_PFX_PASSWORD"
+            else
+              echo "No WINDOWS_PFX_BASE64 — building an unsigned $rid MSIX (fine for the Store)."
+              dotnet publish "$APP" "${common[@]}" -p:AppxPackageSigningEnabled=false
+            fi
+          }
+          build_msix win10-x64
+          build_msix win10-arm64
           mkdir -p out; find . -path '*/msix/*' \( -name '*.msix' -o -name '*.msixbundle' \) -exec cp {} out/ \; || true
           ls -la out || echo "no msix produced"
 
