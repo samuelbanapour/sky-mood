@@ -240,6 +240,10 @@ jobs:
             fi
           }
           build_msix win10-x64
+          # Force a clean rebuild before the 2nd arch: bin/obj aren't redirected on Windows
+          # (Directory.Build.props only does that on macOS/Linux), so without this the 2nd
+          # publish sees "up-to-date" cached x64 outputs and silently skips ARM64.
+          rm -rf SkyMood.App/bin SkyMood.App/obj SkyMood.Core/bin SkyMood.Core/obj
           build_msix win10-arm64
           mkdir -p out; find . -path '*/msix/*' \( -name '*.msix' -o -name '*.msixbundle' \) -exec cp {} out/ \; || true
           ls -la out || echo "no msix produced"
