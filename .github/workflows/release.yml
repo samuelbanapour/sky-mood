@@ -222,12 +222,12 @@ jobs:
           # a PFX is only needed for sideloading.
           build_msix() {
             local rid="$1"
-            # WindowsAppSDKSelfContained=true is required for RuntimeIdentifierOverride to
-            # actually produce per-architecture native binaries — without it the build is
-            # framework-dependent and both "architectures" silently collapse to the same
-            # (host) x64 output.
+            # Use RuntimeIdentifier (not RuntimeIdentifierOverride, which this single-project
+            # MAUI/net10.0-windows setup silently ignores — both "architectures" collapsed to
+            # the host's default win-x64 every time). WindowsAppSDKSelfContained=true makes it
+            # produce true per-architecture native binaries instead of a framework-dependent build.
             local common=(-c Release -p:Heads=windows -f net10.0-windows10.0.19041.0
-                    -p:RuntimeIdentifierOverride="$rid"
+                    -p:RuntimeIdentifier="$rid"
                     -p:WindowsAppSDKSelfContained=true
                     -p:SelfContained=true
                     -p:GenerateAppxPackageOnBuild=true
