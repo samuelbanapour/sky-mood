@@ -226,12 +226,15 @@ jobs:
             # MAUI/net10.0-windows setup silently ignores — both "architectures" collapsed to
             # the host's default win-x64 every time). WindowsAppSDKSelfContained=true makes it
             # produce true per-architecture native binaries instead of a framework-dependent build.
+            # Each arch gets its own AppxPackageDir: GenerateAppxPackageOnBuild cleans its output
+            # folder on every run, so a shared folder would wipe out the previous arch's package
+            # even though the filenames differ.
             local common=(-c Release -p:Heads=windows -f net10.0-windows10.0.19041.0
                     -p:RuntimeIdentifier="$rid"
                     -p:WindowsAppSDKSelfContained=true
                     -p:SelfContained=true
                     -p:GenerateAppxPackageOnBuild=true
-                    -p:AppxPackageDir=msix/
+                    -p:AppxPackageDir=msix-$rid/
                     -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
                     -p:ApplicationVersion=${{ needs.version.outputs.build }})
             if [ -n "$WINDOWS_PFX_BASE64" ]; then
