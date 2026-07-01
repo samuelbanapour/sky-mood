@@ -254,7 +254,7 @@ jobs:
           # publish sees "up-to-date" cached x64 outputs and silently skips ARM64.
           rm -rf SkyMood.App/bin SkyMood.App/obj SkyMood.Core/bin SkyMood.Core/obj
           build_msix win-arm64
-          mkdir -p out; find . -path '*/msix/*' \( -name '*.msix' -o -name '*.msixbundle' \) -exec cp {} out/ \; || true
+          mkdir -p out; find . -path '*/msix-win-*/*' \( -name '*.msix' -o -name '*.msixbundle' \) -exec cp {} out/ \; || true
           ls -la out || echo "no msix produced"
 
       - uses: actions/upload-artifact@v4
