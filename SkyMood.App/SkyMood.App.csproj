@@ -50,6 +50,11 @@
          never leaks into the net10.0 Core project. -->
     <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x64</RuntimeIdentifiers>
 
+    <!-- Without an explicit candidate list, -p:RuntimeIdentifierOverride=win10-arm64 has nothing
+         valid to select and silently falls back to the host RID (win-x64) — both "architectures"
+         built identically. Declaring both here is what makes the override actually take effect. -->
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win10-x64;win10-arm64</RuntimeIdentifiers>
+
     <DefaultItemExcludes>$(DefaultItemExcludes);._*;**/._*</DefaultItemExcludes>
   </PropertyGroup>
 
