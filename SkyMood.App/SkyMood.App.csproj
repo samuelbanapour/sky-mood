@@ -50,6 +50,13 @@
          never leaks into the net10.0 Core project. -->
     <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x64</RuntimeIdentifiers>
 
+    <!-- Marshal Methods (default-on) AOT-generates the JNI registration stubs instead of registering
+         them at runtime. On some 32-bit armeabi-v7a devices (older Fire tablets etc.) that generation
+         is broken: libmonodroid.so loads fine but n_onCreate is never wired up, so the app throws
+         UnsatisfiedLinkError and dies on first launch. Disabling it falls back to dynamic JNI
+         registration, which works on every ABI at a negligible startup-time cost. -->
+    <AndroidEnableMarshalMethods Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">false</AndroidEnableMarshalMethods>
+
     <!-- Without an explicit candidate list, -p:RuntimeIdentifierOverride=win10-arm64 has nothing
          valid to select and silently falls back to the host RID (win-x64) — both "architectures"
          built identically. Declaring both here is what makes the override actually take effect. -->
