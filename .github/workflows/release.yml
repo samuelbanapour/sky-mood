@@ -12,7 +12,11 @@ name: Release Sky Mood
 #   iOS     : IOS_DIST_CERT_P12_BASE64, IOS_DIST_CERT_PASSWORD, IOS_PROVISIONING_PROFILE_BASE64,
 #             IOS_SIGNING_IDENTITY, IOS_PROVISIONING_PROFILE_NAME,
 #             ASC_KEY_ID, ASC_ISSUER_ID, ASC_API_KEY_P8_BASE64
-#   Windows : WINDOWS_PFX_BASE64, WINDOWS_PFX_PASSWORD
+#   Windows : WINDOWS_PFX_BASE64 (unencrypted PFX — see the windows job for why: the SDK's signing
+#             task has no password parameter at all, so an encrypted PFX always fails)
+#   MS Store: MS_PARTNER_TENANT_ID, MS_PARTNER_CLIENT_ID, MS_PARTNER_CLIENT_SECRET (Partner Center →
+#             Account settings → User management → Microsoft Entra applications, Developer role —
+#             just enough to upload/submit packages, not full account management)
 
 on:
   push:
@@ -28,11 +32,18 @@ on:
         description: 'Upload to stores (needs secrets)'
         type: boolean
         default: true
+      windows_store_submit:
+        description: 'Microsoft Store: off (build only) / dry-run (create+upload, no commit) / submit (full submission)'
+        type: choice
+        default: 'off'
+        options: [ 'off', 'dry-run', 'submit' ]
 
 env:
   DOTNET_VERSION: '10.0.x'
   APP: SkyMood.App/SkyMood.App.csproj
   APP_ID: com.gamedevsolo.skymood
+  MS_STORE_APP_ID: '9P9HG0ZLZ992'   # Sky Mood's Store ID, from the apps.microsoft.com listing URL —
+                                    # this IS the "applicationId" the Store submission API expects
 
 jobs:
   # ----------------------------------------------------------------------------- version
@@ -270,9 +281,98 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with: { name: skymood-windows-msix, path: out/*, if-no-files-found: warn }
-      # Store submission: Microsoft Store uses Partner Center. Once your app is registered there,
-      # add a submission step (e.g. microsoft/store-submission or the Store REST API). Left manual
-      # because it needs your Partner Center Azure AD credentials + an existing app listing.
+
+  # ----------------------------------------------------------------------------- Microsoft Store submission
+  # Pushes the signed MSIX packages built above to Partner Center via the Microsoft Store submission
+  # API (v1.0), using the MS_PARTNER_* Azure AD app credentials (Developer role — upload/submit only,
+  # can't touch account settings or payouts).
+  #
+  # Opt-in only (windows_store_submit input, default 'off') — NOT run automatically on every tag push.
+  # A bad submission can leave the app stuck in an uncommitted/pending state that blocks the next
+  # submission until manually cancelled in Partner Center, so this should be a deliberate action.
+  # 'dry-run' does everything except the final commit (creates the submission, uploads the package
+  # zip, points the submission at the new files) so you can review it in Partner Center before
+  # committing — an uncommitted submission can be freely abandoned with no consequence.
+  store-submit:
+    needs: windows
+    if: ${{ inputs.windows_store_submit == 'dry-run' || inputs.windows_store_submit == 'submit' }}
+    runs-on: ubuntu-latest
+    env:
+      MS_PARTNER_TENANT_ID: ${{ secrets.MS_PARTNER_TENANT_ID }}
+      MS_PARTNER_CLIENT_ID: ${{ secrets.MS_PARTNER_CLIENT_ID }}
+      MS_PARTNER_CLIENT_SECRET: ${{ secrets.MS_PARTNER_CLIENT_SECRET }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: skymood-windows-msix, path: msix }
+
+      - name: Submit to Microsoft Store
+        run: |
+          set -euo pipefail
+          if [ -z "$MS_PARTNER_TENANT_ID" ] || [ -z "$MS_PARTNER_CLIENT_ID" ] || [ -z "$MS_PARTNER_CLIENT_SECRET" ]; then
+            echo "Missing MS_PARTNER_* secrets — nothing to submit with. See docs/RELEASE.md."; exit 1
+          fi
+
+          # 1. Client-credentials auth against the Store submission API's resource. This is the
+          # older v1 (ACS/adal-style) token endpoint the v1.0 submission API still expects — the
+          # newer v2.0/MSAL endpoint issues a token this API rejects.
+          TOKEN=$(curl -sf -X POST "https://login.microsoftonline.com/${MS_PARTNER_TENANT_ID}/oauth2/token" \
+            -d "grant_type=client_credentials" \
+            -d "client_id=${MS_PARTNER_CLIENT_ID}" \
+            -d "client_secret=${MS_PARTNER_CLIENT_SECRET}" \
+            -d "resource=https://manage.devcenter.microsoft.com" \
+            | jq -r '.access_token')
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then echo "Auth failed — check the MS_PARTNER_* secrets."; exit 1; fi
+
+          AUTH=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
+          BASE="https://manage.devcenter.microsoft.com/v1.0/my/applications/${MS_STORE_APP_ID}"
+
+          # 2. Creating a submission CLONES the app's current in-store listing/settings as a new
+          # draft. If a submission is already in flight (e.g. left uncommitted from a previous
+          # dry-run, or mid-certification), this call fails outright — that's Microsoft's own
+          # one-submission-at-a-time rule, not something to work around here.
+          CREATE=$(curl -sf -X POST "${BASE}/submissions" "${AUTH[@]}")
+          SUBMISSION_ID=$(echo "$CREATE" | jq -r '.id')
+          UPLOAD_URL=$(echo "$CREATE" | jq -r '.fileUploadUrl')
+          echo "Created submission $SUBMISSION_ID"
+
+          # 3. The upload URL expects a single zip containing exactly the package files referenced
+          # in applicationPackages below — not a bare .msix.
+          mkdir -p pkg && cp msix/*.msix pkg/
+          (cd pkg && zip -r ../submission.zip .)
+
+          # 4. Plain Azure Blob PUT — not a Store API call, so no Authorization header; the SAS
+          # token authorizing the upload is already baked into fileUploadUrl.
+          curl -sf -X PUT "$UPLOAD_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @submission.zip
+
+          # 5. Replace whatever packages the clone carried over with the two new files in the zip.
+          UPDATED=$(echo "$CREATE" | jq '
+            .applicationPackages = [
+              { fileName: "SkyMood.App_1.0.0.0_x64.msix",   fileStatus: "PendingUpload" },
+              { fileName: "SkyMood.App_1.0.0.0_arm64.msix", fileStatus: "PendingUpload" }
+            ]')
+          curl -sf -X PUT "${BASE}/submissions/${SUBMISSION_ID}" "${AUTH[@]}" -d "$UPDATED" > /dev/null
+          echo "Submission ready: https://partner.microsoft.com/dashboard/products/${MS_STORE_APP_ID}/submissions/${SUBMISSION_ID}"
+
+          if [ "${{ inputs.windows_store_submit }}" != "submit" ]; then
+            echo "dry-run: stopping before commit. Review the submission at the URL above, then re-run with 'submit' (or commit it manually in Partner Center)."
+            exit 0
+          fi
+
+          # 6. Commit is the actual point of no return — nothing before this is visible to
+          # Microsoft or affects the live listing.
+          curl -sf -X POST "${BASE}/submissions/${SUBMISSION_ID}/commit" "${AUTH[@]}" > /dev/null
+
+          # 7. Poll for the COMMIT to be accepted/rejected — NOT full certification, which runs
+          # after this workflow ends and can take hours; Partner Center is the place to watch that.
+          for i in $(seq 1 30); do
+            STATUS=$(curl -sf "${BASE}/submissions/${SUBMISSION_ID}/status" "${AUTH[@]}" | jq -r '.status')
+            echo "Status: $STATUS"
+            case "$STATUS" in
+              CommitStarted|PreProcessing) sleep 20 ;;
+              *) break ;;
+            esac
+          done
+          echo "Final status: $STATUS — check Partner Center for certification progress."
 
   # ----------------------------------------------------------------------------- Console (desktop CLI)
   # Self-contained, single-file terminal builds of SkyMood.Console for Windows / Linux / macOS.
