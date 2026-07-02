@@ -238,10 +238,13 @@ jobs:
                     -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
                     -p:ApplicationVersion=${{ needs.version.outputs.build }})
             if [ -n "$WINDOWS_PFX_BASE64" ]; then
-              echo "$WINDOWS_PFX_BASE64" | base64 -d > cert.pfx
+              # PackageCertificateKeyFile resolves relative to the PROJECT directory (SkyMood.App/),
+              # not the invocation cwd — a bare "cert.pfx" written to the repo root silently fails
+              # to resolve (APPX0104: not found), so use an absolute path here.
+              echo "$WINDOWS_PFX_BASE64" | base64 -d > "$GITHUB_WORKSPACE/cert.pfx"
               dotnet publish "$APP" "${common[@]}" \
                 -p:AppxPackageSigningEnabled=true \
-                -p:PackageCertificateKeyFile=cert.pfx \
+                -p:PackageCertificateKeyFile="$GITHUB_WORKSPACE/cert.pfx" \
                 -p:PackageCertificatePassword="$WINDOWS_PFX_PASSWORD"
             else
               echo "No WINDOWS_PFX_BASE64 — building an unsigned $rid MSIX (fine for the Store)."
