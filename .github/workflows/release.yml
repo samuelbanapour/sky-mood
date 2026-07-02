@@ -364,12 +364,16 @@ jobs:
           # token authorizing the upload is already baked into fileUploadUrl.
           curl -sf -X PUT "$UPLOAD_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @submission.zip
 
-          # 5. Replace whatever packages the clone carried over with the two new files in the zip.
+          # 5. The API requires every existing package (identified by its `id`) to still be present
+          # in the array — omitting one isn't "replace", it's rejected outright (400
+          # InvalidParameterValue: "Please keep all file entries for existing packages... mark it
+          # as PendingDelete"). So: mark whatever the clone carried over for deletion, and append the
+          # two new files (no `id` — that's how the API knows they're new) for upload from the zip.
           UPDATED=$(echo "$CREATE" | jq '
-            .applicationPackages = [
+            .applicationPackages = ((.applicationPackages | map(.fileStatus = "PendingDelete")) + [
               { fileName: "SkyMood.App_1.0.0.0_x64.msix",   fileStatus: "PendingUpload" },
               { fileName: "SkyMood.App_1.0.0.0_arm64.msix", fileStatus: "PendingUpload" }
-            ]')
+            ])')
           api_call PUT "${BASE}/submissions/${SUBMISSION_ID}" -d "$UPDATED" > /dev/null
           echo "Submission ready: https://partner.microsoft.com/dashboard/products/${MS_STORE_APP_ID}/submissions/${SUBMISSION_ID}"
 
