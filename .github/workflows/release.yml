@@ -326,11 +326,31 @@ jobs:
           AUTH=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
           BASE="https://manage.devcenter.microsoft.com/v1.0/my/applications/${MS_STORE_APP_ID}"
 
+          # `curl -f` swallows the response body on a non-2xx status, so a failed call gives zero
+          # diagnostic info in the CI log (confirmed the hard way: first version of this script
+          # died silently on a POST with no body — IIS returns 411 Length Required for a bodyless
+          # POST, and -f hid that error message entirely). This wrapper prints the actual body on
+          # failure instead. Also: every POST here needs an explicit -d, even if the payload is
+          # empty (`-d ""`) — curl only sends Content-Length for requests it knows have a body.
+          api_call() {
+            local method="$1" url="$2"; shift 2
+            local resp status body
+            resp=$(curl -s -w '\n%{http_code}' -X "$method" "$url" "${AUTH[@]}" "$@")
+            status=$(echo "$resp" | tail -1)
+            body=$(echo "$resp" | sed '$d')
+            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+              echo "FAILED ($status) $method $url:" >&2
+              echo "$body" >&2
+              exit 1
+            fi
+            echo "$body"
+          }
+
           # 2. Creating a submission CLONES the app's current in-store listing/settings as a new
           # draft. If a submission is already in flight (e.g. left uncommitted from a previous
           # dry-run, or mid-certification), this call fails outright — that's Microsoft's own
           # one-submission-at-a-time rule, not something to work around here.
-          CREATE=$(curl -sf -X POST "${BASE}/submissions" "${AUTH[@]}")
+          CREATE=$(api_call POST "${BASE}/submissions" -d "")
           SUBMISSION_ID=$(echo "$CREATE" | jq -r '.id')
           UPLOAD_URL=$(echo "$CREATE" | jq -r '.fileUploadUrl')
           echo "Created submission $SUBMISSION_ID"
@@ -350,7 +370,7 @@ jobs:
               { fileName: "SkyMood.App_1.0.0.0_x64.msix",   fileStatus: "PendingUpload" },
               { fileName: "SkyMood.App_1.0.0.0_arm64.msix", fileStatus: "PendingUpload" }
             ]')
-          curl -sf -X PUT "${BASE}/submissions/${SUBMISSION_ID}" "${AUTH[@]}" -d "$UPDATED" > /dev/null
+          api_call PUT "${BASE}/submissions/${SUBMISSION_ID}" -d "$UPDATED" > /dev/null
           echo "Submission ready: https://partner.microsoft.com/dashboard/products/${MS_STORE_APP_ID}/submissions/${SUBMISSION_ID}"
 
           if [ "${{ inputs.windows_store_submit }}" != "submit" ]; then
@@ -360,12 +380,12 @@ jobs:
 
           # 6. Commit is the actual point of no return — nothing before this is visible to
           # Microsoft or affects the live listing.
-          curl -sf -X POST "${BASE}/submissions/${SUBMISSION_ID}/commit" "${AUTH[@]}" > /dev/null
+          api_call POST "${BASE}/submissions/${SUBMISSION_ID}/commit" -d "" > /dev/null
 
           # 7. Poll for the COMMIT to be accepted/rejected — NOT full certification, which runs
           # after this workflow ends and can take hours; Partner Center is the place to watch that.
           for i in $(seq 1 30); do
-            STATUS=$(curl -sf "${BASE}/submissions/${SUBMISSION_ID}/status" "${AUTH[@]}" | jq -r '.status')
+            STATUS=$(api_call GET "${BASE}/submissions/${SUBMISSION_ID}/status" | jq -r '.status')
             echo "Status: $STATUS"
             case "$STATUS" in
               CommitStarted|PreProcessing) sleep 20 ;;
