@@ -27,9 +27,11 @@ prints the secrets to set:
 | `ANDROID_KEY_ALIAS` | `skymood-upload` (default) |
 | `ANDROID_KEY_PASSWORD` | key password you chose |
 
-**B. Create the app in [Play Console](https://play.google.com/console)** with package
-`com.gamedevsolo.skymood`, and **enrol in Play App Signing** (recommended). Do one manual upload of
-a first `.aab` if Play requires it before the API will accept uploads.
+**B. Create the app in [Play Console](https://play.google.com/console)** under the **Game Dev Solo**
+developer account (that's the Play/Amazon publisher identity — see `Directory.Build.props` / the
+per-head `Company` override in `SkyMood.App.csproj`), with package `com.gamedevsolo.skymood`, and
+**enrol in Play App Signing** (recommended). Do one manual upload of a first `.aab` if Play requires
+it before the API will accept uploads.
 
 **C. Play API service account** — in Google Cloud, create a service account with the *Google Play
 Android Developer API* enabled, download its JSON key, then in Play Console → *Users & permissions*
@@ -40,6 +42,13 @@ invite that service-account email and grant **Release** access.
 | `PLAY_SERVICE_ACCOUNT_JSON` | the full service-account JSON |
 
 Track is chosen by the workflow input (`internal` by default).
+
+> **New developer account? Production is gated behind closed testing.** Since Google's 2023–2024
+> policy change, a *new* Play Console developer account can't jump straight to Production (or often
+> even Internal, until basic requirements are met) — it must first run a **closed test with at least
+> 12 opted-in testers for 14 continuous days** before Play unlocks a Production release. Budget for
+> that when planning a Sky Mood launch date: create the closed track, recruit testers (a private
+> Google Group or email list works), and let it run its 14 days before expecting a production listing.
 
 ---
 
