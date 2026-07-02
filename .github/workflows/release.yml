@@ -209,6 +209,12 @@ jobs:
     env:
       WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
       WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+      # This job runs under Git Bash (MSYS) on windows-latest. MSYS auto-converts any argument
+      # that looks like a POSIX path (contains "/") before handing it to native exes like dotnet.exe —
+      # a base64/password value containing "/" gets silently mangled, corrupting -p:PackageCertificatePassword
+      # and making cert import fail with a misleading "may be password protected" error regardless of the
+      # actual cert. Disable that conversion for this job.
+      MSYS_NO_PATHCONV: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
