@@ -1,0 +1,394 @@
+# Azure Pipelines mirror of .github/workflows/release.yml — a full backup release pipeline that
+# doesn't depend on GitHub Actions at all (billing outages there can't block a release here).
+# Either pipeline can cut a release; whichever runs most recently wins for shared destinations
+# (the mirror repo, the Store submission).
+#
+# Secrets live in the "skymood-secrets" variable group (Pipelines → Library) — see docs/RELEASE.md
+# for what each one is and how to obtain it; the values themselves are identical to the GitHub
+# Actions secrets of the same name, except WINDOWS_PFX_BASE64, which is a separate self-signed cert
+# (same Publisher CN, generated independently — Azure Pipelines can't read GitHub's copy).
+
+trigger:
+  tags:
+    include: [ 'v*' ]
+pr: none
+
+parameters:
+  - name: androidTrack
+    type: string
+    default: internal
+    values: [ internal, alpha, beta, production ]
+  - name: uploadToStores
+    type: boolean
+    default: true
+  - name: windowsStoreSubmit
+    type: string
+    default: 'off'
+    values: [ 'off', 'dry-run', 'submit' ]
+  - name: syncMirror
+    type: boolean
+    default: false
+
+variables:
+  - group: skymood-secrets
+  - name: DOTNET_VERSION
+    value: '10.0.x'
+  - name: APP
+    value: SkyMood.App/SkyMood.App.csproj
+  - name: APP_ID
+    value: com.gamedevsolo.skymood
+  - name: MS_STORE_APP_ID
+    value: '9P9HG0ZLZ992'
+  - name: isTagPush
+    value: $[ startsWith(variables['Build.SourceBranch'], 'refs/tags/v') ]
+
+resources:
+  repositories:
+    - repository: self
+      type: github
+      endpoint: sky-mood-github
+      name: samuelbanapour/sky-mood
+
+stages:
+  - stage: Release
+    jobs:
+      # ----------------------------------------------------------------------------- version
+      - job: version
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - checkout: none
+          - bash: |
+              if [[ "$BUILD_SOURCEBRANCH" == refs/tags/v* ]]; then
+                disp="${BUILD_SOURCEBRANCH#refs/tags/v}"
+              else
+                disp="0.1.$BUILD_BUILDID"
+              fi
+              echo "##vso[task.setvariable variable=display;isOutput=true]$disp"
+              echo "##vso[task.setvariable variable=buildnum;isOutput=true]$BUILD_BUILDID"
+              echo "Version $disp (build $BUILD_BUILDID)"
+            name: setver
+            env:
+              BUILD_SOURCEBRANCH: $(Build.SourceBranch)
+              BUILD_BUILDID: $(Build.BuildId)
+
+      # ----------------------------------------------------------------------------- Android
+      - job: android
+        dependsOn: version
+        pool: { vmImage: ubuntu-latest }
+        variables:
+          displayVersion: $[ dependencies.version.outputs['setver.display'] ]
+          buildNum: $[ dependencies.version.outputs['setver.buildnum'] ]
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            inputs: { version: '$(DOTNET_VERSION)' }
+          - task: JavaToolInstaller@0
+            inputs: { versionSpec: '17', jdkArchitectureOption: x64, jdkSourceOption: PreInstalled }
+          - bash: dotnet workload install maui-android
+            displayName: Install maui-android workload
+
+          - bash: |
+              if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+                echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$AGENT_TEMPDIRECTORY/upload.keystore"
+                echo "##vso[task.setvariable variable=signed]true"
+              else
+                echo "No ANDROID_KEYSTORE_BASE64 — building unsigned for verification."
+                echo "##vso[task.setvariable variable=signed]false"
+              fi
+            displayName: Decode keystore (if provided)
+            env:
+              ANDROID_KEYSTORE_BASE64: $(ANDROID_KEYSTORE_BASE64)
+              AGENT_TEMPDIRECTORY: $(Agent.TempDirectory)
+
+          - bash: |
+              common=(-c Release -p:Heads=android -f net10.0-android -p:AndroidPackageFormat=aab \
+                      -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum))
+              if [ "$SIGNED" = "true" ]; then
+                dotnet publish "$APP" "${common[@]}" \
+                  -p:AndroidKeyStore=true \
+                  -p:AndroidSigningKeyStore="$(Agent.TempDirectory)/upload.keystore" \
+                  -p:AndroidSigningStorePass="$(ANDROID_KEYSTORE_PASSWORD)" \
+                  -p:AndroidSigningKeyAlias="$(ANDROID_KEY_ALIAS)" \
+                  -p:AndroidSigningKeyPass="$(ANDROID_KEY_PASSWORD)"
+              else
+                dotnet publish "$APP" "${common[@]}"
+              fi
+              mkdir -p "$(Build.ArtifactStagingDirectory)/android-aab"
+              find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-android" -name "*.aab" \
+                -exec cp {} "$(Build.ArtifactStagingDirectory)/android-aab/" \;
+            displayName: Build AAB
+            env: { SIGNED: $(signed) }
+          - publish: $(Build.ArtifactStagingDirectory)/android-aab
+            artifact: skymood-android-aab
+
+          - bash: |
+              common=(-c Release -p:Heads=android -f net10.0-android \
+                      -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum))
+              if [ "$SIGNED" = "true" ]; then
+                dotnet publish "$APP" "${common[@]}" \
+                  -p:AndroidKeyStore=true \
+                  -p:AndroidSigningKeyStore="$(Agent.TempDirectory)/upload.keystore" \
+                  -p:AndroidSigningStorePass="$(ANDROID_KEYSTORE_PASSWORD)" \
+                  -p:AndroidSigningKeyAlias="$(ANDROID_KEY_ALIAS)" \
+                  -p:AndroidSigningKeyPass="$(ANDROID_KEY_PASSWORD)"
+              else
+                dotnet publish "$APP" "${common[@]}"
+              fi
+              mkdir -p "$(Build.ArtifactStagingDirectory)/android-apk"
+              find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-android/publish" \
+                \( -iname "*-Signed.apk" -o -iname "com.gamedevsolo.skymood.apk" \) \
+                -exec cp {} "$(Build.ArtifactStagingDirectory)/android-apk/SkyMood-$(displayVersion)-release.apk" \;
+            displayName: Build sideload APK
+            env: { SIGNED: $(signed) }
+          - publish: $(Build.ArtifactStagingDirectory)/android-apk
+            artifact: skymood-android-apk
+
+      # ----------------------------------------------------------------------------- Windows
+      - job: windows
+        dependsOn: version
+        pool: { vmImage: windows-latest }
+        variables:
+          displayVersion: $[ dependencies.version.outputs['setver.display'] ]
+          buildNum: $[ dependencies.version.outputs['setver.buildnum'] ]
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            inputs: { version: '$(DOTNET_VERSION)' }
+          - bash: dotnet workload install maui-windows
+            displayName: Install maui-windows workload
+
+          - bash: |
+              APPX_MAJOR_MINOR=$(echo "$(displayVersion)" | cut -d. -f1,2)
+              APPX_VERSION="${APPX_MAJOR_MINOR}.$(buildNum).0"
+              sed -i "s/Version=\"1\.0\.0\.0\"/Version=\"${APPX_VERSION}\"/" SkyMood.App/Platforms/Windows/Package.appxmanifest
+              grep Version SkyMood.App/Platforms/Windows/Package.appxmanifest
+            displayName: Stamp a real, unique package version into the appx manifest
+
+          - bash: |
+              build_msix() {
+                local rid="$1"
+                local common=(-c Release -p:Heads=windows -f net10.0-windows10.0.19041.0 \
+                        -p:RuntimeIdentifier="$rid" \
+                        -p:WindowsAppSDKSelfContained=true \
+                        -p:SelfContained=true \
+                        -p:GenerateAppxPackageOnBuild=true \
+                        -p:AppxPackageDir=msix-$rid/ \
+                        -p:ApplicationDisplayVersion=$(displayVersion) \
+                        -p:ApplicationVersion=$(buildNum))
+                if [ -n "$WINDOWS_PFX_BASE64" ]; then
+                  echo "$WINDOWS_PFX_BASE64" | base64 -d > "$BUILD_SOURCESDIRECTORY/cert.pfx"
+                  dotnet publish "$APP" "${common[@]}" \
+                    -p:AppxPackageSigningEnabled=true \
+                    -p:PackageCertificateKeyFile="$BUILD_SOURCESDIRECTORY/cert.pfx"
+                else
+                  dotnet publish "$APP" "${common[@]}" -p:AppxPackageSigningEnabled=false
+                fi
+              }
+              build_msix win-x64
+              rm -rf SkyMood.App/bin SkyMood.App/obj SkyMood.Core/bin SkyMood.Core/obj
+              build_msix win-arm64
+              mkdir -p "$(Build.ArtifactStagingDirectory)/msix"
+              find . -path '*/msix-win-*/*' \( -name '*.msix' -o -name '*.msixbundle' \) \
+                -exec cp {} "$(Build.ArtifactStagingDirectory)/msix/" \; || true
+              ls -la "$(Build.ArtifactStagingDirectory)/msix"
+            displayName: Build MSIX (x64 + ARM64)
+            env:
+              WINDOWS_PFX_BASE64: $(WINDOWS_PFX_BASE64)
+              BUILD_SOURCESDIRECTORY: $(Build.SourcesDirectory)
+          - publish: $(Build.ArtifactStagingDirectory)/msix
+            artifact: skymood-windows-msix
+
+      # ----------------------------------------------------------------------------- iOS (unsigned compile-check — no signing secrets configured here yet)
+      - job: ios
+        dependsOn: version
+        pool: { vmImage: macos-latest }
+        variables:
+          displayVersion: $[ dependencies.version.outputs['setver.display'] ]
+          buildNum: $[ dependencies.version.outputs['setver.buildnum'] ]
+        steps:
+          - checkout: self
+          - bash: dotnet workload install maui-ios maui-maccatalyst --skip-manifest-update
+            displayName: Install iOS workloads
+          - bash: |
+              echo "No iOS signing secrets configured in this pipeline yet — building an UNSIGNED device .app to verify Release compiles."
+              dotnet build "$APP" -c Release -p:Heads=ios -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
+                -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum) \
+                -p:EnableCodeSigning=false -p:CodesignKey="" -p:_RequireCodeSigning=false
+              mkdir -p "$(Build.ArtifactStagingDirectory)/ipa"
+              app=$(find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-ios/ios-arm64" -maxdepth 1 -type d -name '*.app' | head -1)
+              if [ -z "$app" ]; then echo "No device .app under bin/"; exit 1; fi
+              rm -rf Payload && mkdir Payload && cp -R "$app" Payload/
+              zip -qr "$(Build.ArtifactStagingDirectory)/ipa/SkyMood-$(displayVersion)-unsigned.ipa" Payload
+            displayName: Compile-check unsigned .ipa
+          - publish: $(Build.ArtifactStagingDirectory)/ipa
+            artifact: skymood-ios-ipa
+
+      # ----------------------------------------------------------------------------- macOS DMG (ad-hoc — no notarization secrets configured here yet)
+      - job: macosDmg
+        dependsOn: version
+        pool: { vmImage: macos-latest }
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            inputs: { version: '$(DOTNET_VERSION)' }
+          - bash: |
+              mkdir -p "$(Build.ArtifactStagingDirectory)/dmg"
+              for rid in osx-arm64 osx-x64; do
+                arch=${rid#osx-}
+                dotnet publish SkyMood.Desktop/SkyMood.Desktop.csproj -c Release -r "$rid" \
+                  --self-contained true -p:PublishSingleFile=false -o "pub/$rid"
+                bash scripts/package-macos.sh "pub/$rid" "$(Build.ArtifactStagingDirectory)/dmg/SkyMood-macos-$arch.dmg"
+              done
+            displayName: Publish GUI + build (ad-hoc) DMGs — Apple Silicon + Intel
+          - publish: $(Build.ArtifactStagingDirectory)/dmg
+            artifact: skymood-macos-dmg
+
+      # ----------------------------------------------------------------------------- Console (desktop CLI)
+      - job: console
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            inputs: { version: '$(DOTNET_VERSION)' }
+          - bash: |
+              mkdir -p "$(Build.ArtifactStagingDirectory)/console"
+              for rid in linux-x64 linux-arm64 win-x64 osx-x64 osx-arm64; do
+                dotnet publish SkyMood.Console/SkyMood.Console.csproj -c Release -r "$rid" \
+                  --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+                  -o "pub/$rid"
+                if [ -f "pub/$rid/SkyMood.Console.exe" ]; then cp "pub/$rid/SkyMood.Console.exe" "$(Build.ArtifactStagingDirectory)/console/skymood-$rid.exe";
+                else cp "pub/$rid/SkyMood.Console" "$(Build.ArtifactStagingDirectory)/console/skymood-$rid"; fi
+              done
+            displayName: Publish self-contained single-file binaries
+          - publish: $(Build.ArtifactStagingDirectory)/console
+            artifact: skymood-console
+
+      # ----------------------------------------------------------------------------- Desktop GUI (Avalonia)
+      - job: desktop
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            inputs: { version: '$(DOTNET_VERSION)' }
+          - bash: |
+              mkdir -p "$(Build.ArtifactStagingDirectory)/desktop"
+              for rid in linux-x64 linux-arm64 win-x64 osx-x64 osx-arm64; do
+                dotnet publish SkyMood.Desktop/SkyMood.Desktop.csproj -c Release -r "$rid" \
+                  --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+                  -o "pub/$rid"
+                if [ -f "pub/$rid/SkyMood.Desktop.exe" ]; then cp "pub/$rid/SkyMood.Desktop.exe" "$(Build.ArtifactStagingDirectory)/desktop/skymood-gui-$rid.exe";
+                else cp "pub/$rid/SkyMood.Desktop" "$(Build.ArtifactStagingDirectory)/desktop/skymood-gui-$rid"; fi
+              done
+            displayName: Publish self-contained GUI binaries
+          - publish: $(Build.ArtifactStagingDirectory)/desktop
+            artifact: skymood-desktop-gui
+
+      # ----------------------------------------------------------------------------- Mirror sync
+      - job: mirrorSync
+        dependsOn: [ android, windows, macosDmg, desktop ]
+        condition: and(succeeded(), or(eq(variables.isTagPush, 'True'), eq('${{ parameters.syncMirror }}', 'True')))
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - download: current
+            patterns: 'skymood-android-apk/**'
+          - download: current
+            patterns: 'skymood-macos-dmg/**'
+          - download: current
+            patterns: 'skymood-windows-msix/**'
+          - download: current
+            patterns: 'skymood-desktop-gui/**'
+          - bash: |
+              mkdir -p mirror
+              cp "$(Pipeline.Workspace)"/skymood-android-apk/*.apk mirror/SkyMood-android.apk
+              cp "$(Pipeline.Workspace)"/skymood-macos-dmg/SkyMood-macos-arm64.dmg mirror/SkyMood-mac-apple-silicon.dmg
+              cp "$(Pipeline.Workspace)"/skymood-macos-dmg/SkyMood-macos-x64.dmg mirror/SkyMood-mac-intel.dmg
+              cp "$(Pipeline.Workspace)"/skymood-windows-msix/*_x64.msix mirror/SkyMood-windows-x64.msix
+              cp "$(Pipeline.Workspace)"/skymood-windows-msix/*_arm64.msix mirror/SkyMood-windows-arm64.msix
+              cp "$(Pipeline.Workspace)"/skymood-desktop-gui/skymood-gui-linux-x64 mirror/SkyMood-linux-x64
+              cp "$(Pipeline.Workspace)"/skymood-desktop-gui/skymood-gui-linux-arm64 mirror/SkyMood-linux-arm64
+              ls -la mirror
+            displayName: Rename to the fixed filenames the website links to
+          - bash: |
+              if [ -z "$RELEASES_REPO_TOKEN" ]; then echo "No RELEASES_REPO_TOKEN — skipping."; exit 0; fi
+              which gh >/dev/null 2>&1 || { type -p curl >/dev/null; curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg; sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg; echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null; sudo apt-get update -qq; sudo apt-get install -y gh; }
+              export GH_TOKEN="$RELEASES_REPO_TOKEN"
+              gh release upload mac-builds mirror/* -R samuelbanapour/solo-apps-studio-releases --clobber
+            displayName: Upload to the mirror repo's rolling release
+            env: { RELEASES_REPO_TOKEN: $(RELEASES_REPO_TOKEN) }
+
+      # ----------------------------------------------------------------------------- Microsoft Store submission
+      - job: storeSubmit
+        dependsOn: windows
+        condition: and(succeeded(), or(eq('${{ parameters.windowsStoreSubmit }}', 'dry-run'), eq('${{ parameters.windowsStoreSubmit }}', 'submit')))
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - download: current
+            artifact: skymood-windows-msix
+          - bash: |
+              set -euo pipefail
+              if [ -z "$MS_PARTNER_TENANT_ID" ] || [ -z "$MS_PARTNER_CLIENT_ID" ] || [ -z "$MS_PARTNER_CLIENT_SECRET" ]; then
+                echo "Missing MS_PARTNER_* variables — nothing to submit with."; exit 1
+              fi
+              curl -s -X POST "https://login.microsoftonline.com/${MS_PARTNER_TENANT_ID}/oauth2/token" \
+                -d "grant_type=client_credentials" -d "client_id=${MS_PARTNER_CLIENT_ID}" \
+                -d "client_secret=${MS_PARTNER_CLIENT_SECRET}" -d "resource=https://manage.devcenter.microsoft.com" \
+                > /tmp/token_resp.json
+              TOKEN=$(jq -r '.access_token' /tmp/token_resp.json)
+              if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then echo "Auth failed"; cat /tmp/token_resp.json; exit 1; fi
+
+              BASE="https://manage.devcenter.microsoft.com/v1.0/my/applications/${MS_STORE_APP_ID}"
+              AUTH=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
+
+              api_call() {
+                local method="$1" url="$2"; shift 2
+                local resp status body
+                resp=$(curl -s -w '\n%{http_code}' -X "$method" "$url" "${AUTH[@]}" "$@")
+                status=$(echo "$resp" | tail -1)
+                body=$(echo "$resp" | sed '$d')
+                if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+                  echo "FAILED ($status) $method $url:" >&2; echo "$body" >&2; exit 1
+                fi
+                echo "$body"
+              }
+
+              api_call POST "${BASE}/submissions" -d "" > /tmp/create.json
+              SUBMISSION_ID=$(jq -r '.id' /tmp/create.json)
+              UPLOAD_URL=$(jq -r '.fileUploadUrl' /tmp/create.json)
+              echo "Created submission $SUBMISSION_ID"
+
+              MSIX_DIR="$(Pipeline.Workspace)/skymood-windows-msix"
+              mkdir -p pkg && cp "$MSIX_DIR"/*.msix pkg/
+              (cd pkg && zip -q -r ../submission.zip .)
+              curl -sf -X PUT "$UPLOAD_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @submission.zip
+
+              X64_NAME=$(basename "$MSIX_DIR"/*_x64.msix)
+              ARM64_NAME=$(basename "$MSIX_DIR"/*_arm64.msix)
+              jq --arg x64 "$X64_NAME" --arg arm64 "$ARM64_NAME" '
+                .applicationPackages = ((.applicationPackages | map(.fileStatus = "PendingDelete")) + [
+                  { fileName: $x64,   fileStatus: "PendingUpload" },
+                  { fileName: $arm64, fileStatus: "PendingUpload" }
+                ])' /tmp/create.json > /tmp/updated.json
+              api_call PUT "${BASE}/submissions/${SUBMISSION_ID}" --data-binary @/tmp/updated.json > /dev/null
+              echo "Submission ready: https://partner.microsoft.com/dashboard/products/${MS_STORE_APP_ID}/submissions/${SUBMISSION_ID}"
+
+              if [ "${{ parameters.windowsStoreSubmit }}" != "submit" ]; then
+                echo "dry-run: stopping before commit."
+                exit 0
+              fi
+
+              api_call POST "${BASE}/submissions/${SUBMISSION_ID}/commit" -d "" > /dev/null
+              for i in $(seq 1 30); do
+                api_call GET "${BASE}/submissions/${SUBMISSION_ID}/status" > /tmp/status.json
+                STATUS=$(jq -r '.status' /tmp/status.json)
+                echo "Status: $STATUS"
+                case "$STATUS" in
+                  CommitStarted|PreProcessing) sleep 20 ;;
+                  *) break ;;
+                esac
+              done
+              echo "Final status: $STATUS"
+            displayName: Submit to Microsoft Store
+            env:
+              MS_PARTNER_TENANT_ID: $(MS_PARTNER_TENANT_ID)
+              MS_PARTNER_CLIENT_ID: $(MS_PARTNER_CLIENT_ID)
+              MS_PARTNER_CLIENT_SECRET: $(MS_PARTNER_CLIENT_SECRET)
