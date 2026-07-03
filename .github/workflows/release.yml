@@ -267,10 +267,19 @@ jobs:
           # once, so a second, different build under the same version number is a hard reject, not
           # just a warning.
           #
-          # Appx versions need exactly 4 numeric parts. needs.version.outputs.display is always
-          # exactly 3 (X.Y.Z, from the version job), so append the run number as the 4th — that
-          # guarantees a new value on every single CI run, even a re-run of the same tag.
-          APPX_VERSION="${{ needs.version.outputs.display }}.${{ needs.version.outputs.build }}"
+          # Appx versions need exactly 4 numeric parts, Major.Minor.Build.Revision — and the Store
+          # HARD REJECTS any submission with a non-zero Revision ("Apps are not allowed to have a
+          # Version with a revision number other than zero"), confirmed live: the first fix here
+          # put the run number in the 4th slot and every real submission failed with that exact
+          # message. Revision is reserved for Microsoft's own internal use, not ours.
+          #
+          # So uniqueness has to live in Build (3rd slot) instead: use GITHUB_RUN_NUMBER there —
+          # it's monotonically increasing across the whole repo regardless of source (tag push or
+          # manual run), which both guarantees a new value every single CI run (even a re-run of
+          # the same tag) and keeps versions strictly increasing, which the Store wants anyway for
+          # update recognition. Major.Minor come from the tag; Revision is always 0.
+          APPX_MAJOR_MINOR=$(echo "${{ needs.version.outputs.display }}" | cut -d. -f1,2)
+          APPX_VERSION="${APPX_MAJOR_MINOR}.${{ needs.version.outputs.build }}.0"
           sed -i "s/Version=\"1\.0\.0\.0\"/Version=\"${APPX_VERSION}\"/" SkyMood.App/Platforms/Windows/Package.appxmanifest
           grep Version SkyMood.App/Platforms/Windows/Package.appxmanifest
 
