@@ -37,6 +37,10 @@ on:
         type: choice
         default: 'off'
         options: [ 'off', 'dry-run', 'submit' ]
+      sync_mirror:
+        description: 'Sync builds to the website download mirror (solo-apps-studio-releases) — always on for tag pushes regardless of this'
+        type: boolean
+        default: false
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -112,6 +116,33 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with: { name: skymood-android-aab, path: out/*.aab, if-no-files-found: error }
+
+      - name: Build sideload APK
+        run: |
+          # The AAB above is Play-only — Play itself splits it into installable APKs, but nothing
+          # else can install an .aab directly. GitHub Releases / direct downloads need an actual
+          # .apk, so publish a second time with AndroidPackageFormat=apk (the default format;
+          # everything else — signing, ABIs, marshal-methods-disabled — matches the AAB build).
+          common=(-c Release -p:Heads=android -f net10.0-android
+                  -p:ApplicationDisplayVersion=${{ needs.version.outputs.display }}
+                  -p:ApplicationVersion=${{ needs.version.outputs.build }})
+          if [ "${{ steps.ks.outputs.signed }}" = "true" ]; then
+            dotnet publish "$APP" "${common[@]}" \
+              -p:AndroidKeyStore=true \
+              -p:AndroidSigningKeyStore="$RUNNER_TEMP/upload.keystore" \
+              -p:AndroidSigningStorePass="$ANDROID_KEYSTORE_PASSWORD" \
+              -p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS" \
+              -p:AndroidSigningKeyPass="$ANDROID_KEY_PASSWORD"
+          else
+            dotnet publish "$APP" "${common[@]}"
+          fi
+          mkdir -p apk-out
+          find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-android/publish" -iname "*-Signed.apk" -exec cp {} "apk-out/SkyMood-${{ needs.version.outputs.display }}-release.apk" \; \
+            -o -iname "com.gamedevsolo.skymood.apk" -exec cp {} "apk-out/SkyMood-${{ needs.version.outputs.display }}-release.apk" \;
+          ls -la apk-out
+
+      - uses: actions/upload-artifact@v4
+        with: { name: skymood-android-apk, path: apk-out/*.apk, if-no-files-found: error }
 
       - name: Upload to Google Play
         if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' && steps.ks.outputs.signed == 'true' && (github.event_name == 'push' || inputs.upload) }}
@@ -492,3 +523,40 @@ jobs:
           done
       - uses: actions/upload-artifact@v4
         with: { name: skymood-macos-dmg, path: out/*.dmg, if-no-files-found: error }
+
+  # ----------------------------------------------------------------------------- Mirror sync
+  # solo-apps-studio-website's download buttons link to fixed filenames on the
+  # solo-apps-studio-releases repo's rolling `mac-builds` release tag, not to this repo's
+  # (versioned) releases directly. This job copies the builds above there under those fixed names,
+  # so the website always points at the latest build without anyone manually re-uploading assets —
+  # a backup for that manual `gh release upload --clobber` process, not a replacement for it; either
+  # one updates the exact same release, so whichever runs most recently wins.
+  #
+  # Always runs on a real release (tag push). Also available on-demand via the sync_mirror input for
+  # testing, without needing to cut a real tag.
+  mirror-sync:
+    needs: [ android, windows, macos-dmg, desktop ]
+    if: ${{ github.event_name == 'push' || inputs.sync_mirror }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, pattern: 'skymood-*' }
+
+      - name: Rename to the fixed filenames the website links to
+        run: |
+          mkdir -p mirror
+          cp artifacts/skymood-android-apk/*.apk mirror/SkyMood-android.apk
+          cp artifacts/skymood-macos-dmg/SkyMood-macos-arm64.dmg mirror/SkyMood-mac-apple-silicon.dmg
+          cp artifacts/skymood-macos-dmg/SkyMood-macos-x64.dmg mirror/SkyMood-mac-intel.dmg
+          cp artifacts/skymood-windows-msix/SkyMood.App_1.0.0.0_x64.msix mirror/SkyMood-windows-x64.msix
+          cp artifacts/skymood-windows-msix/SkyMood.App_1.0.0.0_arm64.msix mirror/SkyMood-windows-arm64.msix
+          cp artifacts/skymood-desktop-gui/skymood-gui-linux-x64 mirror/SkyMood-linux-x64
+          cp artifacts/skymood-desktop-gui/skymood-gui-linux-arm64 mirror/SkyMood-linux-arm64
+          ls -la mirror
+
+      - name: Upload to the mirror repo's rolling release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "No RELEASES_REPO_TOKEN — skipping mirror sync."; exit 0; fi
+          gh release upload mac-builds mirror/* -R samuelbanapour/solo-apps-studio-releases --clobber
