@@ -21,4 +21,27 @@
     <BaseOutputPath>$(HOME)/.skymood-build/$(MSBuildProjectName)/bin/</BaseOutputPath>
   </PropertyGroup>
 
+  <!--
+    net10.0-ios PHYSICAL DEVICE builds only: the BaseOutputPath override above breaks the iOS
+    SDK's internal publish-path computation when OutDir lives outside the project tree (it
+    string-concatenates the absolute project path into the publish dir, producing a garbled
+    nested path — the real SkyMood.App executable never lands in the .app bundle, and the build
+    fails at "dsymutil ... cannot parse the debug map ... No such file or directory"). Simulator
+    and MacCatalyst/Android/Windows builds are unaffected; this only bites device (ios-arm64)
+    builds. Workaround: rsync SkyMood.App + SkyMood.Core (source only, no bin/obj) to a plain
+    APFS folder — e.g. ~/.skymood-ios-src/ — and build/deploy from there instead of in place.
+    Device deploy recipe once you have a signed .app, using Xcode's modern devicectl (NOT the
+    older mlaunch, which can hang indefinitely against current iOS/Xcode pairing): its "install
+    app" and "process launch" subcommands, targeting the paired device's UDID (device flag) and
+    this app's bundle id, com.gamedevsolo.skymood (see SkyMood.App/README-style comments/READMEs
+    elsewhere in this repo for the exact copy-pasteable command — not reproduced here because its
+    double-hyphen device flag isn't valid inside an XML comment).
+    Free/personal-team signing expires after ~7 days and needs reinstalling.
+  -->
+
+  <!-- SkyMood.App/SkyMood.App.csproj has a _PostProcessAppBundle target (device builds only)
+       that embeds SkyMoodWatch.app into the .app bundle so it's a real WatchConnectivity
+       companion, not a side-loaded standalone watch app. See the comment on that target for the
+       build recipe and why the hook point had to be _PostProcessAppBundle specifically. -->
+
 </Project>

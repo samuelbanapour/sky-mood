@@ -1,0 +1,102 @@
+import SwiftUI
+
+struct ContentView: View {
+    @StateObject private var model = WeatherModel()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 6) {
+                    if let reading = model.reading {
+                        let desc = WeatherCodes.describe(reading.code)
+
+                        Text(desc.emoji)
+                            .font(.system(size: 40))
+
+                        Text("\(WeatherReading.display(reading.tempC, fahrenheit: model.isFahrenheit))°")
+                            .font(.system(size: 34, weight: .semibold))
+
+                        Text(desc.label)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        if !model.placeName.isEmpty {
+                            Text(model.placeName)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack(spacing: 10) {
+                            Label("\(WeatherReading.display(reading.highC, fahrenheit: model.isFahrenheit))°", systemImage: "arrow.up")
+                            Label("\(WeatherReading.display(reading.lowC, fahrenheit: model.isFahrenheit))°", systemImage: "arrow.down")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+
+                        Text("Feels like \(WeatherReading.display(reading.feelsLikeC, fahrenheit: model.isFahrenheit))°")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+
+                        Text("UV \(Int(reading.uvIndex.rounded())) · \(WeatherReading.uvBand(reading.uvIndex))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+
+                        if !reading.daily.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(reading.daily) { day in
+                                        VStack(spacing: 2) {
+                                            Text(day.day)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Text(WeatherCodes.describe(day.code).emoji)
+                                                .font(.system(size: 16))
+                                            Text("\(WeatherReading.display(day.highC, fahrenheit: model.isFahrenheit))°")
+                                                .font(.caption2)
+                                            Text("\(WeatherReading.display(day.lowC, fahrenheit: model.isFahrenheit))°")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 4)
+                            }
+                            .padding(.top, 4)
+                        }
+                    } else if model.isLoading {
+                        ProgressView()
+                        Text("Getting weather…")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else if let err = model.errorText {
+                        Text(err)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Button("Retry") { model.refresh() }
+                            .font(.caption2)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .navigationTitle("Sky Mood")
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        model.refresh()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
+                    NavigationLink {
+                        PlacesView(model: model)
+                    } label: {
+                        Image(systemName: "list.bullet")
+                    }
+                }
+            }
+            .onAppear { model.refresh() }
+        }
+    }
+}

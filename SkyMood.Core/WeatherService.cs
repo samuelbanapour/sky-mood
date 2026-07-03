@@ -10,7 +10,9 @@ namespace SkyMood;
 /// Priority by default:
 ///   1. Satellite  — a fresh direct pass from your ground station (works with zero internet)
 ///   2. Live       — Open-Meteo over HTTPS (also the path used over a Starlink/Viasat ISP)
-///   3. Cache      — last reading saved on this device (final offline fallback)
+///   3. Live (NOAA)— NOAA/NWS, US-only, independent infrastructure from Open-Meteo — kicks in
+///                   if Open-Meteo itself is down (rather than just your own connection)
+///   4. Cache      — last reading saved on this device (final offline fallback)
 /// </summary>
 public sealed class WeatherService
 {
@@ -23,7 +25,7 @@ public sealed class WeatherService
         _sources = sources;
     }
 
-    /// <summary>Convenience factory wiring the standard satellite → online → cache chain.</summary>
+    /// <summary>Convenience factory wiring the standard satellite → online → NOAA → cache chain.</summary>
     public static WeatherService CreateDefault(string cacheDir, string satelliteInboxDir, HttpClient? http = null)
     {
         var cache = new OfflineCache(cacheDir);
@@ -31,6 +33,7 @@ public sealed class WeatherService
         {
             new SatelliteWeatherSource(satelliteInboxDir),
             new OnlineWeatherSource(http),
+            new NoaaWeatherSource(http),
         };
         return new WeatherService(cache, sources);
     }

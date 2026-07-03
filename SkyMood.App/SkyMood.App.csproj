@@ -80,4 +80,43 @@
     <ProjectReference Include="..\SkyMood.Core\SkyMood.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    Embeds the native SkyMoodWatch companion (see ../SkyMoodWatch/) into this app's device build
+    so watchOS recognizes it as a real paired companion (WKCompanionAppBundleIdentifier), not a
+    side-loaded standalone app. Hooked via AfterTargets/BeforeTargets rather than by name: the
+    obvious-looking extension point "_PostProcessAppBundle" (referenced in CreateAppBundleDependsOn)
+    turns out to NOT be an empty stub — the SDK's own legacy tools/msbuild/Xamarin.Shared.targets
+    defines a real one there (dSYM generation + native stripping) that's imported after this csproj
+    and silently wins MSBuild's "last definition of a Target name" override rule, discarding a
+    same-named Target here entirely (confirmed via `-v:diag`: "Overriding target
+    '_PostProcessAppBundle' ... with target ... from ... tools/msbuild/Xamarin.Shared.targets").
+    AfterTargets/BeforeTargets add to the dependency graph instead of replacing a Target by name, so
+    this runs right where intended — after resources/executable are in the bundle, before Codesign —
+    without clobbering the SDK's own dSYM/stripping step. Device builds only: simulator Watch apps
+    are a different architecture/signing story entirely and aren't handled here.
+
+    SkyMoodWatchAppPath expects a fixed, non-hashed location, so build the watch app with:
+      xcodebuild -project SkyMoodWatch.xcodeproj -scheme SkyMoodWatch \
+        -destination "generic/platform=watchOS" -derivedDataPath ~/.skymoodwatch-src/build \
+        -allowProvisioningUpdates build
+    (see SkyMoodWatch/README.md for the full recipe). Xcode's default DerivedData path has a
+    project-specific hash suffix that isn't stable across machines/checkouts, hence pinning it.
+  -->
+  <Target Name="_EmbedSkyMoodWatch"
+          AfterTargets="_PostProcessAppBundle"
+          BeforeTargets="Codesign"
+          Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' and '$(RuntimeIdentifier)' == 'ios-arm64'">
+    <PropertyGroup>
+      <SkyMoodWatchAppPath Condition="'$(SkyMoodWatchAppPath)' == ''">$(HOME)/.skymoodwatch-src/build/Build/Products/Debug-watchos/SkyMoodWatch.app</SkyMoodWatchAppPath>
+    </PropertyGroup>
+    <ItemGroup Condition="Exists('$(SkyMoodWatchAppPath)')">
+      <_WatchAppFiles Include="$(SkyMoodWatchAppPath)/**/*" />
+    </ItemGroup>
+    <Copy Condition="Exists('$(SkyMoodWatchAppPath)')"
+          SourceFiles="@(_WatchAppFiles)"
+          DestinationFiles="@(_WatchAppFiles->'$(_AppBundlePath)/Watch/SkyMoodWatch.app/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Warning Condition="!Exists('$(SkyMoodWatchAppPath)')"
+             Text="SkyMoodWatchAppPath ($(SkyMoodWatchAppPath)) not found -- shipping without the embedded Watch companion. Build SkyMoodWatch first (see SkyMoodWatch/README.md)." />
+  </Target>
+
 </Project>

@@ -48,6 +48,15 @@ public partial class MainPage : ContentPage
 
         AddTapBurst(EmojiLabel);   // tap the emoji or temperature for a confetti burst
         AddTapBurst(TempLabel);
+
+#if IOS
+        WatchConnectivityService.Instance.Configure(
+            getCurrentLocation: () => _location,
+            refresh: loc => _weather.GetAsync(loc),
+            getPlaces: () => _weather.CachedPlaces(),
+            selectLocation: loc => SetLocationAsync(loc),
+            getIsFahrenheit: () => _fahrenheit);
+#endif
     }
 
     protected override async void OnAppearing()
@@ -112,6 +121,9 @@ public partial class MainPage : ContentPage
             _current = result;
             RenderResult(result);
             BuildPlaces();
+#if IOS
+            WatchConnectivityService.Instance.Push(result);
+#endif
         }
         catch (WeatherUnavailableException ex)
         {
