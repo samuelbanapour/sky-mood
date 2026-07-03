@@ -354,7 +354,13 @@ jobs:
   store-submit:
     needs: windows
     if: ${{ inputs.windows_store_submit == 'dry-run' || inputs.windows_store_submit == 'submit' }}
-    runs-on: ubuntu-latest
+    # Self-hosted, not ubuntu-latest: this job is just curl/jq/zip against a REST API, no GitHub-
+    # hosted-runner-specific tooling needed — and self-hosted runners don't consume GitHub Actions
+    # minutes at all, so this job can't be blocked by GitHub Actions billing/spending-limit issues
+    # (confirmed the hard way — see git log around 2026-07-02/03). Runner is a background service on
+    # a local Mac, labeled skymood-store-submit; `./svc.sh status` / `stop` / `start` in
+    # ~/actions-runner-skymood manages it.
+    runs-on: skymood-store-submit
     env:
       MS_PARTNER_TENANT_ID: ${{ secrets.MS_PARTNER_TENANT_ID }}
       MS_PARTNER_CLIENT_ID: ${{ secrets.MS_PARTNER_CLIENT_ID }}
