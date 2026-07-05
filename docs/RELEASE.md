@@ -1,13 +1,23 @@
 # Releasing Sky Mood (signed builds → TestFlight & Play Console)
 
-The [`release.yml`](../.github/workflows/build.yml) workflow builds **signed** store packages and
-uploads them. It runs on a version tag (`git tag v1.0.0 && git push --tags`) or manually from the
-**Actions → Release Sky Mood → Run workflow** button.
+Release automation lives in **[Azure Pipelines](https://dev.azure.com/SamuelBanapour/sky-mood/_build?definitionId=1)**
+(`azure-pipelines.yml`), not GitHub Actions — the GitHub Actions release workflow was removed after
+repeatedly hitting GitHub's billing/spending-limit wall. `build.yml` (a fast Debug-build + unit-test
+gate on every push/PR, not a release pipeline) is the only GitHub Actions workflow left in this repo.
+
+The pipeline runs on a version tag (`git tag v1.0.0 && git push --tags`) or manually — either from
+Azure DevOps (**Pipelines → sky-mood-release → Run pipeline**) or via the CLI:
+```bash
+az pipelines run --id 1 --parameters uploadToStores=false windowsStoreSubmit=off syncMirror=false --branch main
+```
 
 It degrades gracefully: with **no** secrets it still builds (unsigned) artifacts so you can confirm
 the pipeline; add the secrets for a platform and that platform starts producing a **signed** build
-and uploading to the store. Set secrets at **Settings → Secrets and variables → Actions**
-(or `gh secret set NAME`).
+and uploading to the store. Secrets live in the **skymood-secrets** variable group (Azure DevOps →
+Pipelines → Library), settable via the web UI or:
+```bash
+az pipelines variable-group variable create --group-id 1 --name NAME --value "VALUE" --secret true
+```
 
 > You need the paid developer accounts first: **Apple Developer Program** ($99/yr) for iOS/TestFlight
 > and a **Google Play Developer** account ($25 once) for Play. Windows Store submission needs a
@@ -41,7 +51,9 @@ invite that service-account email and grant **Release** access.
 |---|---|
 | `PLAY_SERVICE_ACCOUNT_JSON` | the full service-account JSON |
 
-Track is chosen by the workflow input (`internal` by default).
+Track is chosen by the `androidTrack` pipeline parameter (`internal` by default) — Android upload
+itself isn't wired into `azure-pipelines.yml` yet (see the gaps note at the bottom), but this stays
+as the intended reference for whenever that's added.
 
 > **New developer account? Production is gated behind closed testing.** Since Google's 2023–2024
 > policy change, a *new* Play Console developer account can't jump straight to Production (or often
@@ -84,23 +96,54 @@ The build produces a signed `.ipa` and `xcrun altool` uploads it to TestFlight.
 
 ## 3. Windows → MSIX
 
-For **sideload/Store** signing, supply a code-signing certificate (`.pfx`). For testing you can make
-a self-signed one:
+For **sideload/Store** signing, supply a code-signing certificate (`.pfx`). The subject's `CN` must
+exactly match the `Publisher` in `SkyMood.App/Platforms/Windows/Package.appxmanifest`
+(`CN=AB578A7A-AB77-4581-85A4-109FDE76C7BE`).
 
-```powershell
-$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Solo Apps Studio" `
-  -CertStoreLocation Cert:\CurrentUser\My
-Export-PfxCertificate -Cert $cert -FilePath skymood.pfx -Password (ConvertTo-SecureString -String "PFXPASS" -AsPlainText -Force)
+**The PFX must be fully unencrypted** — no password. This SDK version's signing task
+(`WinAppSdkSignAppxPackage`) has no password parameter anywhere in its pipeline; a password-protected
+PFX always fails with a misleading `APPX0105: may be password protected` regardless of the actual
+password. GitHub/Azure secret storage is the real protection here, not PFX encryption.
+
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout cert.key -out cert.crt -days 3650 -nodes \
+  -subj "/CN=AB578A7A-AB77-4581-85A4-109FDE76C7BE" \
+  -addext "keyUsage=digitalSignature" -addext "extendedKeyUsage=codeSigning"
+openssl pkcs12 -export -out skymood.pfx -inkey cert.key -in cert.crt \
+  -passout pass: -certpbe NONE -keypbe NONE -nomac
 ```
 
 | Secret | Value |
 |---|---|
 | `WINDOWS_PFX_BASE64` | `base64 -i skymood.pfx` |
-| `WINDOWS_PFX_PASSWORD` | the .pfx password |
 
-The job emits a signed `.msix`. **Microsoft Store** submission goes through Partner Center — once your
-app is registered there, add a submission step (Store REST API / `microsoft/store-submission`); it's
-left manual because it needs your Partner Center Azure AD app credentials and an existing listing.
+Note: GitHub Actions and Azure Pipelines each have their **own separately-generated** cert under this
+recipe (Azure can't read GitHub's copy) — same Publisher CN, different physical certificate/thumbprint.
+
+The job emits a signed `.msix`. **Microsoft Store submission is automated** via the `storeSubmit`
+job, using the Store submission API v1.0 directly (client-credentials auth, no `microsoft/store-submission`
+action needed).
+
+**Setup** — Partner Center → Account settings → User management → Microsoft Entra applications →
+**Add Microsoft Entra application**, role **Developer** (upload/submit only — not Manager, which
+also grants account/user/tenant management this credential doesn't need):
+
+| Secret | Value |
+|---|---|
+| `MS_PARTNER_TENANT_ID` | the Microsoft Entra tenant ID (from Account settings → Tenants) |
+| `MS_PARTNER_CLIENT_ID` | the Entra application's Client ID |
+| `MS_PARTNER_CLIENT_SECRET` | the key generated for that application |
+
+Controlled by the `windowsStoreSubmit` pipeline parameter: `off` (default — build only), `dry-run`
+(creates the submission, uploads the package zip, points it at the new files, but stops **before**
+committing — safe to review in Partner Center or abandon with no consequence), `submit` (commits and
+kicks off real certification). Always try `dry-run` first for anything you haven't verified recently
+— an uncommitted submission costs nothing, but Microsoft only allows one submission in flight at a
+time, so a bad `submit` can leave the app stuck until you manually cancel it in Partner Center.
+
+The appx package version is stamped fresh on every run (`Package.appxmanifest`'s `Identity Version`
+is otherwise hardcoded and never changes) — `Major.Minor` from the tag, `Build` = the CI run number,
+`Revision` always `0` (the Store hard-rejects any non-zero revision).
 
 ---
 
@@ -133,9 +176,18 @@ The result is `SkyMood-macos-arm64.dmg`, stapled so Gatekeeper accepts it offlin
 
 ```bash
 git tag v1.0.0
-git push origin v1.0.0          # triggers release.yml → signed builds + uploads
-# …or run it manually from the Actions tab (toggle "Upload to stores" off for a dry run)
+git push origin v1.0.0          # does NOT auto-trigger Azure Pipelines — see below
 ```
 
-Bump the version by tagging `vX.Y.Z`; the workflow feeds `X.Y.Z` as the display version and the run
-number as the build number. Without a tag (manual run) it uses `0.1.<run-number>`.
+Unlike the old GitHub Actions setup, pushing a tag alone doesn't kick off a build — Azure Pipelines
+here only triggers on a tag push if you run it from that ref. Actually cut a release by triggering
+the pipeline manually (web UI or `az pipelines run`, above) with **Pipeline version** / `--branch`
+set to the tag you just pushed. Bump the version by tagging `vX.Y.Z`; the pipeline feeds `X.Y.Z` as
+the display version and the Azure build number as the build number. Without a tag it uses `0.1.<build-number>`.
+
+**Current gaps versus the old GitHub Actions setup** (same as before it was removed — nothing lost,
+just not yet ported): iOS signing (`IOS_*`/`ASC_*` secrets), macOS notarization (`MACOS_DEVID_*`),
+and the Google Play upload step aren't wired into `azure-pipelines.yml` yet, since none of those
+secrets were ever configured on GitHub Actions either. iOS builds unsigned (compile-check only) and
+macOS builds ad-hoc-signed — add the equivalent secrets to the `skymood-secrets` variable group and
+the corresponding pipeline steps whenever those are ready to wire up.
