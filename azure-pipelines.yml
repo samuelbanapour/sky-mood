@@ -366,6 +366,17 @@ stages:
                 echo "$body"
               }
 
+              # A prior run that failed after creating a submission but before committing it left an
+              # uncommitted draft behind — POST /submissions 409s ("Create submission failed,
+              # status code Conflict") as long as it's still pending. Cancel it first so this run
+              # isn't permanently blocked by a leftover draft from an earlier failure.
+              api_call GET "${BASE}" > /tmp/app.json
+              PENDING_ID=$(jq -r '.pendingApplicationSubmission.id // empty' /tmp/app.json)
+              if [ -n "$PENDING_ID" ]; then
+                echo "Cancelling leftover pending submission $PENDING_ID"
+                api_call DELETE "${BASE}/submissions/${PENDING_ID}" > /dev/null
+              fi
+
               api_call POST "${BASE}/submissions" -d "" > /tmp/create.json
               SUBMISSION_ID=$(jq -r '.id' /tmp/create.json)
               UPLOAD_URL=$(jq -r '.fileUploadUrl' /tmp/create.json)

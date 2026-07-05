@@ -76,7 +76,9 @@ public sealed class OnlineWeatherSource : IWeatherSource
             LowC: First(daily, "temperature_2m_min"),
             ObservedAt: DateTimeOffset.Now,
             UvIndex: Num(cur, "uv_index"),
-            Daily: forecast);
+            Daily: forecast,
+            TimezoneId: root.TryGetProperty("timezone", out var tz) && tz.ValueKind == JsonValueKind.String
+                ? tz.GetString() : null);
     }
 
     /// <summary>Builds the multi-day outlook from the parallel arrays Open-Meteo returns under "daily".</summary>

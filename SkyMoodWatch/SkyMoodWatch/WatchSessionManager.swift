@@ -33,6 +33,7 @@ struct PhonePayload {
     let uvIndex: Double
     let daily: [DailyForecastSummary]
     let places: [PlaceSummary]
+    let timezoneId: String?
 }
 
 /// Talks to the SkyMood.App companion over WatchConnectivity. Every call degrades gracefully —
@@ -127,7 +128,8 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
             isFahrenheit: dict["fahrenheit"] as? Bool ?? false,
             uvIndex: dict["uvIndex"] as? Double ?? 0,
             daily: daily,
-            places: places
+            places: places,
+            timezoneId: (dict["timezoneId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 }

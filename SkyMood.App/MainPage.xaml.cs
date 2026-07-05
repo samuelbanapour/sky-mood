@@ -14,6 +14,7 @@ public partial class MainPage : ContentPage
 
     IDispatcherTimer? _animTimer;
     IDispatcherTimer? _refreshTimer;
+    IDispatcherTimer? _clockTimer;
     GeoLocation _location;
     WeatherResult? _current;
     bool _fahrenheit;
@@ -75,6 +76,12 @@ public partial class MainPage : ContentPage
         _refreshTimer.Interval = TimeSpan.FromMinutes(5);
         _refreshTimer.Tick += async (_, _) => await RefreshAsync();
         _refreshTimer.Start();
+
+        // Ticks the displayed local-time-at-location clock without re-fetching weather data.
+        _clockTimer = Dispatcher.CreateTimer();
+        _clockTimer.Interval = TimeSpan.FromSeconds(30);
+        _clockTimer.Tick += (_, _) => { if (_current is not null) UpdatePlaceLabel(_current); };
+        _clockTimer.Start();
     }
 
     protected override void OnDisappearing()
@@ -82,6 +89,7 @@ public partial class MainPage : ContentPage
         base.OnDisappearing();
         _animTimer?.Stop();
         _refreshTimer?.Stop();
+        _clockTimer?.Stop();
         StopParallax();
     }
 
@@ -144,7 +152,7 @@ public partial class MainPage : ContentPage
         TempLabel.Text = Temp(r.Reading.TempC);
         DescLabel.Text = r.Reading.IsDay ? v.Label : $"{v.Label} · night";
         QuipLabel.Text = QuipFor(v.Kind, r.Reading.TempC, r.Reading.IsDay);
-        PlaceLabel.Text = $"{r.Location.Display}  ·  {r.Reading.ObservedAt.ToLocalTime():t}";
+        UpdatePlaceLabel(r);
         FeelsLabel.Text = Temp(r.Reading.FeelsLikeC);
         HumidityLabel.Text = $"{r.Reading.Humidity}%";
         WindLabel.Text = $"{Math.Round(r.Reading.WindKph)} km/h";
@@ -161,6 +169,26 @@ public partial class MainPage : ContentPage
         _scene.RainIntensity = v.RainIntensity;
         _scene.SnowIntensity = v.SnowIntensity;
         _scene.WindKph = r.Reading.WindKph;
+    }
+
+    // Shows the *location's* current local time (re-computed live by _clockTimer), not when the
+    // reading was fetched — that's what "what time is it in Germany right now" actually means.
+    void UpdatePlaceLabel(WeatherResult r) =>
+        PlaceLabel.Text = $"{r.Location.Display}  ·  {LocalTimeText(r.Reading)}";
+
+    static string LocalTimeText(WeatherReading reading)
+    {
+        if (reading.TimezoneId is { Length: > 0 } tz)
+        {
+            try
+            {
+                var zone = TimeZoneInfo.FindSystemTimeZoneById(tz);
+                return TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).ToString("t");
+            }
+            catch (TimeZoneNotFoundException) { /* unknown id on this platform — fall through */ }
+            catch (InvalidTimeZoneException) { /* corrupt tz data — fall through */ }
+        }
+        return DateTimeOffset.Now.ToString("t"); // no resolved zone — device's own local time
     }
 
     // The weather emoji is keyed to the condition (☀️ for "clear"); swap the sun-bearing ones for

@@ -26,6 +26,14 @@ struct ContentView: View {
                                 .foregroundStyle(.secondary)
                         }
 
+                        // Location's own local time, not the watch's — re-renders every 30s via
+                        // TimelineView so it stays live without a manually managed Timer.
+                        TimelineView(.periodic(from: .now, by: 30)) { _ in
+                            Text(reading.localTimeText())
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+
                         HStack(spacing: 10) {
                             Label("\(WeatherReading.display(reading.highC, fahrenheit: model.isFahrenheit))°", systemImage: "arrow.up")
                             Label("\(WeatherReading.display(reading.lowC, fahrenheit: model.isFahrenheit))°", systemImage: "arrow.down")

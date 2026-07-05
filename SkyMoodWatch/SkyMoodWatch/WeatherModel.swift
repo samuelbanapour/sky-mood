@@ -11,6 +11,7 @@ struct WeatherReading {
     let isDay: Bool
     let uvIndex: Double
     let daily: [DailyForecastSummary]
+    let timezoneId: String?
 
     static func display(_ celsius: Double, fahrenheit: Bool) -> Int {
         Int((fahrenheit ? celsius * 9.0 / 5.0 + 32.0 : celsius).rounded())
@@ -25,6 +26,22 @@ struct WeatherReading {
         case ..<11: return "Very High"
         default: return "Extreme"
         }
+    }
+
+    /// The location's current local time (not the watch's own) — looked up fresh so it stays
+    /// correct across DST, mirroring MainPage.xaml.cs's LocalTimeText on the phone.
+    func localTimeText() -> String {
+        if let tz = timezoneId, let zone = TimeZone(identifier: tz) {
+            let formatter = DateFormatter()
+            formatter.timeZone = zone
+            formatter.timeStyle = .short
+            formatter.dateStyle = .none
+            return formatter.string(from: Date())
+        }
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return formatter.string(from: Date()) // no resolved zone — watch's own local time
     }
 }
 
@@ -88,7 +105,8 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             code: payload.code,
             isDay: payload.isDay,
             uvIndex: payload.uvIndex,
-            daily: payload.daily
+            daily: payload.daily,
+            timezoneId: payload.timezoneId
         )
         placeName = payload.placeName
         places = payload.places
@@ -160,6 +178,7 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         let code = (current["weather_code"] as? NSNumber)?.intValue ?? 0
         let isDay = (current["is_day"] as? NSNumber)?.intValue == 1
         let uv = current["uv_index"] as? Double ?? 0
+        let timezoneId = json?["timezone"] as? String
         let highs = daily["temperature_2m_max"] as? [Double] ?? []
         let lows = daily["temperature_2m_min"] as? [Double] ?? []
         let times = daily["time"] as? [String] ?? []
@@ -193,7 +212,8 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             code: code,
             isDay: isDay,
             uvIndex: uv,
-            daily: forecast
+            daily: forecast,
+            timezoneId: timezoneId
         )
     }
 
@@ -226,6 +246,7 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
               let gridY = props["gridY"] as? Int,
               let stationsUrl = props["observationStations"] as? String
         else { throw WeatherFetchError.unavailable } // e.g. outside NWS/US coverage
+        let timezoneId = props["timeZone"] as? String
 
         guard let stations = try await getJSON(stationsUrl),
               let features = stations["features"] as? [[String: Any]],
@@ -278,7 +299,8 @@ final class WeatherModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             code: currentCode,
             isDay: isDay,
             uvIndex: 0,
-            daily: forecast
+            daily: forecast,
+            timezoneId: timezoneId
         )
     }
 

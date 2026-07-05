@@ -50,6 +50,7 @@ public sealed class NoaaWeatherSource : IWeatherSource
             var gridY = props.GetProperty("gridY").GetInt32();
             var stationsUrl = props.GetProperty("observationStations").GetString();
             if (gridId is null || stationsUrl is null) return null;
+            var timezoneId = props.TryGetProperty("timeZone", out var tzEl) ? tzEl.GetString() : null;
 
             var stations = await GetJsonAsync(stationsUrl, ct).ConfigureAwait(false);
             var stationUrl = stations?.GetProperty("features").EnumerateArray().FirstOrDefault().GetProperty("id").GetString();
@@ -99,7 +100,8 @@ public sealed class NoaaWeatherSource : IWeatherSource
                 LowC: lowC,
                 ObservedAt: DateTimeOffset.Now,
                 UvIndex: 0,
-                Daily: daily);
+                Daily: daily,
+                TimezoneId: timezoneId);
         }
         catch
         {

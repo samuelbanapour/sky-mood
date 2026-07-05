@@ -126,7 +126,7 @@ public sealed class WatchConnectivityService : WCSessionDelegate
                 new NSString("lat"), new NSString("lon"), new NSString("placeName"),
                 new NSString("tempC"), new NSString("feelsLikeC"), new NSString("highC"), new NSString("lowC"),
                 new NSString("code"), new NSString("isDay"), new NSString("fahrenheit"),
-                new NSString("uvIndex"), new NSString("daily"), new NSString("places"),
+                new NSString("uvIndex"), new NSString("daily"), new NSString("places"), new NSString("timezoneId"),
             },
             new NSObject[]
             {
@@ -143,6 +143,7 @@ public sealed class WatchConnectivityService : WCSessionDelegate
                 NSNumber.FromDouble(result.Reading.UvIndex),
                 NSArray.FromNSObjects(dailyDicts),
                 NSArray.FromNSObjects(placeDicts),
+                new NSString(result.Reading.TimezoneId ?? ""),
             });
     }
 }

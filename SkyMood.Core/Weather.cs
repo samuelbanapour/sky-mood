@@ -44,7 +44,11 @@ public sealed record WeatherReading(
     DateTimeOffset ObservedAt,
     // Added later — defaulted so old cached JSON (without these) still deserializes.
     double UvIndex = 0,
-    IReadOnlyList<DailyForecast>? Daily = null)
+    IReadOnlyList<DailyForecast>? Daily = null,
+    // IANA id (e.g. "Europe/Berlin"), resolved by whichever source served this reading — lets the
+    // UI show the *location's* current local time rather than the device's own, and stays correct
+    // across DST since it's looked up fresh at display time rather than stored as a fixed offset.
+    string? TimezoneId = null)
 {
     public WeatherVisual Visual => WeatherCodes.Describe(WeatherCode);
 
