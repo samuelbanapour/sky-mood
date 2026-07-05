@@ -101,7 +101,8 @@ public sealed class NoaaWeatherSource : IWeatherSource
                 ObservedAt: DateTimeOffset.Now,
                 UvIndex: 0,
                 Daily: daily,
-                TimezoneId: timezoneId);
+                TimezoneId: timezoneId,
+                UtcOffsetSeconds: TryGetUtcOffsetSeconds(timezoneId));
         }
         catch
         {
@@ -184,6 +185,22 @@ public sealed class NoaaWeatherSource : IWeatherSource
             }
         }
         return codes;
+    }
+
+    /// <summary>Best-effort numeric fallback for heads that can't do IANA-name lookups (Windows
+    /// under InvariantGlobalization). Unlike Open-Meteo, NWS doesn't hand back a raw offset, so
+    /// this still needs a zone-database lookup — safe to fail here since TimezoneId already
+    /// covers the tzdata-backed platforms and this is strictly a bonus for the others.</summary>
+    static double? TryGetUtcOffsetSeconds(string? timezoneId)
+    {
+        if (string.IsNullOrEmpty(timezoneId)) return null;
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            return zone.GetUtcOffset(DateTimeOffset.UtcNow).TotalSeconds;
+        }
+        catch (TimeZoneNotFoundException) { return null; }
+        catch (InvalidTimeZoneException) { return null; }
     }
 
     /// <summary>NWS icon URLs look like ".../icons/land/night/bkn?size=medium" or

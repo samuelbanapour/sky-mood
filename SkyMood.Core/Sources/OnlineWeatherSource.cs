@@ -78,7 +78,9 @@ public sealed class OnlineWeatherSource : IWeatherSource
             UvIndex: Num(cur, "uv_index"),
             Daily: forecast,
             TimezoneId: root.TryGetProperty("timezone", out var tz) && tz.ValueKind == JsonValueKind.String
-                ? tz.GetString() : null);
+                ? tz.GetString() : null,
+            UtcOffsetSeconds: root.TryGetProperty("utc_offset_seconds", out var off) && off.ValueKind == JsonValueKind.Number
+                ? off.GetDouble() : null);
     }
 
     /// <summary>Builds the multi-day outlook from the parallel arrays Open-Meteo returns under "daily".</summary>

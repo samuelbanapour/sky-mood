@@ -70,7 +70,7 @@ static void Render(WeatherResult r)
         Console.WriteLine($"  │  {line,-40}  │");
     Console.WriteLine("  ├────────────────────────────────────────────┤");
     Console.WriteLine($"  │  {v.Emoji}  {r.Reading.TempC,4:0}°C   {v.Label,-26} │");
-    Console.WriteLine($"  │  {r.Location.Display,-42} │");
+    Console.WriteLine($"  │  {r.Location.Display,-30}  {LocalTime(r.Reading),-9} │");
     Console.WriteLine("  ├────────────────────────────────────────────┤");
     Console.WriteLine($"  │  Feels {r.Reading.FeelsLikeC,3:0}°   Humidity {r.Reading.Humidity,3}%          │");
     Console.WriteLine($"  │  Wind {r.Reading.WindKph,4:0} km/h   High {r.Reading.HighC,3:0}° / Low {r.Reading.LowC,3:0}°  │");
@@ -78,6 +78,13 @@ static void Render(WeatherResult r)
     Console.WriteLine($"     {badge}  {r.Note}   (source: {r.SourceName})");
     Console.WriteLine();
 }
+
+// Arithmetic only, no zone-database lookup — this project builds with InvariantGlobalization,
+// which on Windows can't map an IANA id ("Europe/Berlin") to a zone (that needs ICU); a plain
+// numeric offset needs no lookup at all, so it works the same on every OS regardless.
+static string LocalTime(WeatherReading reading) => reading.UtcOffsetSeconds is { } offset
+    ? DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromSeconds(offset)).ToString("t")
+    : DateTimeOffset.Now.ToString("t"); // no offset resolved — this machine's own local time
 
 // A tiny ASCII sky so even the console build is a little bit fun.
 static string[] Scene(WeatherKind kind, bool day) => kind switch

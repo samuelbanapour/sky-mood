@@ -48,7 +48,13 @@ public sealed record WeatherReading(
     // IANA id (e.g. "Europe/Berlin"), resolved by whichever source served this reading — lets the
     // UI show the *location's* current local time rather than the device's own, and stays correct
     // across DST since it's looked up fresh at display time rather than stored as a fixed offset.
-    string? TimezoneId = null)
+    // Mobile/watch (MAUI, Swift) use this — TimeZoneInfo lookups there run on tzdata-backed OSes.
+    string? TimezoneId = null,
+    // Plain numeric fallback for the same "local time at this location" feature on heads built
+    // with <InvariantGlobalization>true</InvariantGlobalization> (Console, Desktop) — Windows
+    // under invariant mode can't map an IANA id to a zone (that needs ICU), but this needs no
+    // lookup at all, just arithmetic, so it's safe everywhere regardless of globalization mode.
+    double? UtcOffsetSeconds = null)
 {
     public WeatherVisual Visual => WeatherCodes.Describe(WeatherCode);
 

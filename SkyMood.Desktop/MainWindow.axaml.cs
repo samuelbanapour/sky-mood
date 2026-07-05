@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     bool _celebrate;
     DispatcherTimer? _timer;
     DispatcherTimer? _refresh;
+    DispatcherTimer? _clock;
     readonly Random _rnd = new();
 
     public MainWindow()
@@ -62,6 +63,11 @@ public partial class MainWindow : Window
             _refresh = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
             _refresh.Tick += async (_, _) => await Refresh();
             _refresh.Start();
+
+            // Ticks the displayed local-time-at-location clock without re-fetching weather data.
+            _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _clock.Tick += (_, _) => { if (_current is not null) UpdatePlaceText(_current); };
+            _clock.Start();
         };
     }
 
@@ -88,7 +94,7 @@ public partial class MainWindow : Window
         TempText.Text = Temp(r.Reading.TempC);
         DescText.Text = r.Reading.IsDay ? v.Label : $"{v.Label} · night";
         QuipText.Text = QuipFor(v.Kind, r.Reading.TempC, r.Reading.IsDay);
-        PlaceText.Text = $"{r.Location.Display}  ·  {r.Reading.ObservedAt.ToLocalTime():t}";
+        UpdatePlaceText(r);
         FeelsText.Text = Temp(r.Reading.FeelsLikeC);
         HumText.Text = $"{r.Reading.Humidity}%";
         WindText.Text = $"{Math.Round(r.Reading.WindKph)} km/h";
@@ -105,6 +111,17 @@ public partial class MainWindow : Window
         Scene.SnowIntensity = v.SnowIntensity;
         Scene.WindKph = r.Reading.WindKph;
     }
+
+    // Shows the *location's* current local time (re-computed live by _clock), not when the
+    // reading was fetched. Arithmetic only, no zone-database lookup — this project builds with
+    // InvariantGlobalization, which on Windows can't map an IANA id to a zone (needs ICU); a
+    // plain numeric offset needs no lookup at all, so it works the same on every OS regardless.
+    void UpdatePlaceText(WeatherResult r) =>
+        PlaceText.Text = $"{r.Location.Display}  ·  {LocalTimeText(r.Reading)}";
+
+    static string LocalTimeText(WeatherReading reading) => reading.UtcOffsetSeconds is { } offset
+        ? DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromSeconds(offset)).ToString("t")
+        : DateTimeOffset.Now.ToString("t"); // no offset resolved — this machine's own local time
 
     void SetBadge(DataChannel ch, string note)
     {
