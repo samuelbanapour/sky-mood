@@ -366,21 +366,25 @@ stages:
                 echo "$body"
               }
 
-              # A prior run that failed after creating a submission but before committing it left an
-              # uncommitted draft behind — POST /submissions 409s ("Create submission failed,
-              # status code Conflict") as long as it's still pending. Cancel it first so this run
-              # isn't permanently blocked by a leftover draft from an earlier failure.
+              # POST /submissions 409s ("Create submission failed, status code Conflict") if a
+              # pending submission already exists — so reuse it instead of deleting it. This
+              # matters because Partner Center's Store listing/Properties/Pricing edits live on
+              # that pending submission; for a brand-new app (no prior committed submission to
+              # inherit content from), deleting it and creating a fresh one wipes all of that
+              # back to empty. Only fall back to creating a new submission when none is pending.
               api_call GET "${BASE}" > /tmp/app.json
               PENDING_ID=$(jq -r '.pendingApplicationSubmission.id // empty' /tmp/app.json)
               if [ -n "$PENDING_ID" ]; then
-                echo "Cancelling leftover pending submission $PENDING_ID"
-                api_call DELETE "${BASE}/submissions/${PENDING_ID}" > /dev/null
+                echo "Reusing existing pending submission $PENDING_ID"
+                SUBMISSION_ID="$PENDING_ID"
+                api_call GET "${BASE}/submissions/${SUBMISSION_ID}" > /tmp/create.json
+                UPLOAD_URL=$(jq -r '.fileUploadUrl' /tmp/create.json)
+              else
+                api_call POST "${BASE}/submissions" -d "" > /tmp/create.json
+                SUBMISSION_ID=$(jq -r '.id' /tmp/create.json)
+                UPLOAD_URL=$(jq -r '.fileUploadUrl' /tmp/create.json)
+                echo "Created submission $SUBMISSION_ID"
               fi
-
-              api_call POST "${BASE}/submissions" -d "" > /tmp/create.json
-              SUBMISSION_ID=$(jq -r '.id' /tmp/create.json)
-              UPLOAD_URL=$(jq -r '.fileUploadUrl' /tmp/create.json)
-              echo "Created submission $SUBMISSION_ID"
 
               MSIX_DIR="$(Pipeline.Workspace)/skymood-windows-msix"
               mkdir -p pkg && cp "$MSIX_DIR"/*.msix pkg/
