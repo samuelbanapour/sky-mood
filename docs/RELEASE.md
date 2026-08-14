@@ -186,8 +186,12 @@ set to the tag you just pushed. Bump the version by tagging `vX.Y.Z`; the pipeli
 the display version and the Azure build number as the build number. Without a tag it uses `0.1.<build-number>`.
 
 **Current gaps versus the old GitHub Actions setup** (same as before it was removed — nothing lost,
-just not yet ported): iOS signing (`IOS_*`/`ASC_*` secrets), macOS notarization (`MACOS_DEVID_*`),
-and the Google Play upload step aren't wired into `azure-pipelines.yml` yet, since none of those
-secrets were ever configured on GitHub Actions either. iOS builds unsigned (compile-check only) and
-macOS builds ad-hoc-signed — add the equivalent secrets to the `skymood-secrets` variable group and
-the corresponding pipeline steps whenever those are ready to wire up.
+just not yet ported): macOS notarization (`MACOS_DEVID_*`) and the Google Play upload step aren't
+wired into `azure-pipelines.yml` yet, since neither was ever configured on GitHub Actions either.
+macOS still builds ad-hoc-signed — add `MACOS_SIGN_IDENTITY` (plus the shared `ASC_*` key) to the
+`skymood-secrets` variable group whenever that's ready to wire up.
+
+iOS signing **is** wired into `azure-pipelines.yml`'s `ios` job: add the `IOS_*`/`ASC_*` secrets from
+section 2 above to the `skymood-secrets` variable group and the job will produce a signed `.ipa` and
+upload it to TestFlight automatically. With none of those secrets set it still degrades to the old
+unsigned compile-check build.

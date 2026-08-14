@@ -198,7 +198,7 @@ stages:
           - publish: $(Build.ArtifactStagingDirectory)/msix
             artifact: skymood-windows-msix
 
-      # ----------------------------------------------------------------------------- iOS (unsigned compile-check — no signing secrets configured here yet)
+      # ----------------------------------------------------------------------------- iOS (signed + uploaded to TestFlight if IOS_*/ASC_* secrets are configured, else unsigned compile-check)
       - job: ios
         dependsOn: version
         pool: { vmImage: macos-latest }
@@ -224,19 +224,97 @@ stages:
               xcodebuild -version
             displayName: Select a working Xcode matching the iOS workload
 
+          # Imports the distribution cert into a throwaway keychain and installs the provisioning
+          # profile — mirrors the Android "decode keystore if provided" step below in style. Only
+          # runs the import when all four secrets are present; otherwise falls through to the
+          # existing unsigned compile-check path so the job still degrades gracefully.
           - bash: |
-              echo "No iOS signing secrets configured in this pipeline yet — building an UNSIGNED device .app to verify Release compiles."
-              dotnet build "$APP" -c Release -p:Heads=ios -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
-                -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum) \
-                -p:EnableCodeSigning=false -p:CodesignKey="" -p:_RequireCodeSigning=false
+              if [ -n "$IOS_DIST_CERT_P12_BASE64" ] && [ -n "$IOS_PROVISIONING_PROFILE_BASE64" ] && \
+                 [ -n "$IOS_SIGNING_IDENTITY" ] && [ -n "$IOS_PROVISIONING_PROFILE_NAME" ]; then
+                KEYCHAIN_PATH="$AGENT_TEMPDIRECTORY/ios-signing.keychain-db"
+                KEYCHAIN_PASSWORD=$(uuidgen)
+                security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+                security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+                security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+                security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+
+                echo "$IOS_DIST_CERT_P12_BASE64" | base64 -d > "$AGENT_TEMPDIRECTORY/dist.p12"
+                security import "$AGENT_TEMPDIRECTORY/dist.p12" -k "$KEYCHAIN_PATH" -P "$IOS_DIST_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+                # Without this, codesign hits a silent "User interaction is not allowed" wall on CI.
+                security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+                mkdir -p ~/Library/MobileDevice/"Provisioning Profiles"
+                echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/"Provisioning Profiles"/skymood-distribution.mobileprovision
+
+                echo "##vso[task.setvariable variable=signed]true"
+                echo "##vso[task.setvariable variable=keychainPath]$KEYCHAIN_PATH"
+              else
+                echo "No IOS_DIST_CERT_P12_BASE64/IOS_PROVISIONING_PROFILE_BASE64/IOS_SIGNING_IDENTITY/IOS_PROVISIONING_PROFILE_NAME — building unsigned for verification."
+                echo "##vso[task.setvariable variable=signed]false"
+              fi
+            displayName: Import iOS signing certificate + provisioning profile (if provided)
+            env:
+              IOS_DIST_CERT_P12_BASE64: $(IOS_DIST_CERT_P12_BASE64)
+              IOS_DIST_CERT_PASSWORD: $(IOS_DIST_CERT_PASSWORD)
+              IOS_PROVISIONING_PROFILE_BASE64: $(IOS_PROVISIONING_PROFILE_BASE64)
+              IOS_SIGNING_IDENTITY: $(IOS_SIGNING_IDENTITY)
+              IOS_PROVISIONING_PROFILE_NAME: $(IOS_PROVISIONING_PROFILE_NAME)
+              AGENT_TEMPDIRECTORY: $(Agent.TempDirectory)
+
+          - bash: |
               mkdir -p "$(Build.ArtifactStagingDirectory)/ipa"
-              app=$(find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-ios/ios-arm64" -maxdepth 1 -type d -name '*.app' | head -1)
-              if [ -z "$app" ]; then echo "No device .app under bin/"; exit 1; fi
-              rm -rf Payload && mkdir Payload && cp -R "$app" Payload/
-              zip -qr "$(Build.ArtifactStagingDirectory)/ipa/SkyMood-$(displayVersion)-unsigned.ipa" Payload
-            displayName: Compile-check unsigned .ipa
+              if [ "$SIGNED" = "true" ]; then
+                dotnet build "$APP" -c Release -p:Heads=ios -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
+                  -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum) \
+                  -p:ArchiveOnBuild=true -p:BuildIpa=true \
+                  -p:CodesignKey="$IOS_SIGNING_IDENTITY" -p:CodesignProvision="$IOS_PROVISIONING_PROFILE_NAME"
+                ipa=$(find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-ios/ios-arm64" -maxdepth 1 -name '*.ipa' | head -1)
+                if [ -z "$ipa" ]; then echo "No signed .ipa under bin/"; exit 1; fi
+                cp "$ipa" "$(Build.ArtifactStagingDirectory)/ipa/SkyMood-$(displayVersion).ipa"
+                echo "##vso[task.setvariable variable=ipaFile]SkyMood-$(displayVersion).ipa"
+                [ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true
+              else
+                echo "Building an UNSIGNED device .app to verify Release compiles."
+                dotnet build "$APP" -c Release -p:Heads=ios -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
+                  -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum) \
+                  -p:EnableCodeSigning=false -p:CodesignKey="" -p:_RequireCodeSigning=false
+                app=$(find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-ios/ios-arm64" -maxdepth 1 -type d -name '*.app' | head -1)
+                if [ -z "$app" ]; then echo "No device .app under bin/"; exit 1; fi
+                rm -rf Payload && mkdir Payload && cp -R "$app" Payload/
+                zip -qr "$(Build.ArtifactStagingDirectory)/ipa/SkyMood-$(displayVersion)-unsigned.ipa" Payload
+                echo "##vso[task.setvariable variable=ipaFile]SkyMood-$(displayVersion)-unsigned.ipa"
+              fi
+            displayName: Build .ipa (signed if a certificate was imported, else unsigned compile-check)
+            env:
+              SIGNED: $(signed)
+              IOS_SIGNING_IDENTITY: $(IOS_SIGNING_IDENTITY)
+              IOS_PROVISIONING_PROFILE_NAME: $(IOS_PROVISIONING_PROFILE_NAME)
+              KEYCHAIN_PATH: $(keychainPath)
           - publish: $(Build.ArtifactStagingDirectory)/ipa
             artifact: skymood-ios-ipa
+
+          # TestFlight upload — separate from signing, since a signed .ipa can still be built
+          # without an App Store Connect API key (e.g. to just verify signing works).
+          - bash: |
+              if [ "$SIGNED" != "true" ]; then
+                echo "Not signed — skipping TestFlight upload."; exit 0
+              fi
+              if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_API_KEY_P8_BASE64" ]; then
+                echo "Signed .ipa built, but no ASC_KEY_ID/ASC_ISSUER_ID/ASC_API_KEY_P8_BASE64 — skipping TestFlight upload."
+                exit 0
+              fi
+              mkdir -p ~/.appstoreconnect/private_keys
+              echo "$ASC_API_KEY_P8_BASE64" | base64 -d > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+              xcrun altool --upload-app -f "$(Build.ArtifactStagingDirectory)/ipa/$IPA_FILE" -t ios \
+                --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+              echo "Uploaded to TestFlight ✓"
+            displayName: Upload to TestFlight (if App Store Connect API key provided)
+            env:
+              SIGNED: $(signed)
+              IPA_FILE: $(ipaFile)
+              ASC_KEY_ID: $(ASC_KEY_ID)
+              ASC_ISSUER_ID: $(ASC_ISSUER_ID)
+              ASC_API_KEY_P8_BASE64: $(ASC_API_KEY_P8_BASE64)
 
       # ----------------------------------------------------------------------------- macOS DMG (ad-hoc — no notarization secrets configured here yet)
       - job: macosDmg
