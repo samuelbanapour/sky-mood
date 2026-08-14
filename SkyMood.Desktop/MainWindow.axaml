@@ -49,21 +49,25 @@
             </Grid>
 
             <!-- hero -->
-            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,0,0,4">
-                    <Border Name="BadgeBorder" Background="#3FB36B" CornerRadius="9" Padding="9,3">
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Stretch" MaxWidth="480" Spacing="4">
+                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4">
+                    <Border Grid.Column="0" Name="BadgeBorder" Background="#3FB36B" CornerRadius="9" Padding="9,3" VerticalAlignment="Center">
                         <TextBlock Name="BadgeText" Text="LIVE" FontWeight="Bold" FontSize="11" Foreground="#06210F" />
                     </Border>
-                    <TextBlock Name="NoteText" Text="" Foreground="#CCDCE6F5" FontSize="12" VerticalAlignment="Center" />
-                </StackPanel>
+                    <TextBlock Grid.Column="1" Name="NoteText" Text="" Foreground="#CCDCE6F5" FontSize="12"
+                               VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                </Grid>
 
                 <TextBlock Name="EmojiText" Text="☀️" FontSize="66" HorizontalAlignment="Center" />
                 <TextBlock Name="TempText" Text="—" FontSize="88" FontWeight="Thin" Foreground="White" HorizontalAlignment="Center" />
-                <TextBlock Name="DescText" Text="" FontSize="21" Foreground="White" HorizontalAlignment="Center" />
-                <TextBlock Name="QuipText" Text="" FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" />
-                <TextBlock Name="PlaceText" Text="" FontSize="13" Foreground="#CCDCE6F5" HorizontalAlignment="Center" Margin="0,2,0,16" />
+                <TextBlock Name="DescText" Text="" FontSize="21" Foreground="White" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center" />
+                <TextBlock Name="QuipText" Text="" FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center" />
+                <TextBlock Name="PlaceText" Text="" FontSize="13" Foreground="#CCDCE6F5" HorizontalAlignment="Center" Margin="0,2,0,16"
+                           TextWrapping="Wrap" TextAlignment="Center" />
 
-                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Width="384">
+                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" HorizontalAlignment="Stretch">
                     <Border Grid.Row="0" Grid.Column="0" Classes="tile" Margin="0,0,4,6">
                         <StackPanel><TextBlock Text="FEELS LIKE" FontSize="11" Foreground="#A0DCE6F5" /><TextBlock Name="FeelsText" Text="—" FontSize="22" Foreground="White" /></StackPanel>
                     </Border>
@@ -88,12 +92,12 @@
                 </Grid>
 
                 <TextBlock Name="ForecastHeader" Text="7-DAY FORECAST" FontSize="11" Foreground="#99DCE6F5" Margin="2,16,0,6" HorizontalAlignment="Left" />
-                <ScrollViewer Name="ForecastScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Width="384">
+                <ScrollViewer Name="ForecastScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
                     <StackPanel Name="ForecastPanel" Orientation="Horizontal" Spacing="8" />
                 </ScrollViewer>
 
                 <TextBlock Text="SAVED PLACES" FontSize="11" Foreground="#99DCE6F5" Margin="2,16,0,6" HorizontalAlignment="Left" />
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Width="384">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
                     <StackPanel Name="PlacesPanel" Orientation="Horizontal" Spacing="10" />
                 </ScrollViewer>
             </StackPanel>

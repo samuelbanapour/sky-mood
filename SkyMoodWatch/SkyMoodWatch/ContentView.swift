@@ -24,6 +24,9 @@ struct ContentView: View {
                             Text(model.placeName)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.75)
                         }
 
                         // Location's own local time, not the watch's — re-renders every 30s via
@@ -32,23 +35,32 @@ struct ContentView: View {
                             Text(reading.localTimeText())
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
 
                         HStack(spacing: 10) {
                             Label("\(WeatherReading.display(reading.highC, fahrenheit: model.isFahrenheit))°", systemImage: "arrow.up")
+                                .lineLimit(1)
                             Label("\(WeatherReading.display(reading.lowC, fahrenheit: model.isFahrenheit))°", systemImage: "arrow.down")
+                                .lineLimit(1)
                         }
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .minimumScaleFactor(0.8)
                         .padding(.top, 2)
 
                         Text("Feels like \(WeatherReading.display(reading.feelsLikeC, fahrenheit: model.isFahrenheit))°")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         Text("UV \(Int(reading.uvIndex.rounded())) · \(WeatherReading.uvBand(reading.uvIndex))")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         if !reading.daily.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -58,13 +70,19 @@ struct ContentView: View {
                                             Text(day.day)
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.7)
                                             Text(WeatherCodes.describe(day.code).emoji)
                                                 .font(.system(size: 16))
                                             Text("\(WeatherReading.display(day.highC, fahrenheit: model.isFahrenheit))°")
                                                 .font(.caption2)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.8)
                                             Text("\(WeatherReading.display(day.lowC, fahrenheit: model.isFahrenheit))°")
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.8)
                                         }
                                     }
                                 }

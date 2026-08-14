@@ -69,8 +69,8 @@ static void Render(WeatherResult r)
     foreach (var line in Scene(v.Kind, r.Reading.IsDay))
         Console.WriteLine($"  │  {line,-40}  │");
     Console.WriteLine("  ├────────────────────────────────────────────┤");
-    Console.WriteLine($"  │  {v.Emoji}  {r.Reading.TempC,4:0}°C   {v.Label,-26} │");
-    Console.WriteLine($"  │  {r.Location.Display,-30}  {LocalTime(r.Reading),-9} │");
+    Console.WriteLine($"  │  {v.Emoji}  {r.Reading.TempC,4:0}°C   {Fit(v.Label, 26),-26} │");
+    Console.WriteLine($"  │  {Fit(r.Location.Display, 30),-30}  {LocalTime(r.Reading),-9} │");
     Console.WriteLine("  ├────────────────────────────────────────────┤");
     Console.WriteLine($"  │  Feels {r.Reading.FeelsLikeC,3:0}°   Humidity {r.Reading.Humidity,3}%          │");
     Console.WriteLine($"  │  Wind {r.Reading.WindKph,4:0} km/h   High {r.Reading.HighC,3:0}° / Low {r.Reading.LowC,3:0}°  │");
@@ -78,6 +78,9 @@ static void Render(WeatherResult r)
     Console.WriteLine($"     {badge}  {r.Note}   (source: {r.SourceName})");
     Console.WriteLine();
 }
+
+// Truncates with an ellipsis so a long label/place name can't push past the card's fixed border.
+static string Fit(string s, int width) => s.Length <= width ? s : string.Concat(s.AsSpan(0, Math.Max(width - 1, 0)), "…");
 
 // Arithmetic only, no zone-database lookup — this project builds with InvariantGlobalization,
 // which on Windows can't map an IANA id ("Europe/Berlin") to a zone (that needs ICU); a plain

@@ -9,7 +9,8 @@
         <GraphicsView x:Name="SceneView" />
 
         <ScrollView>
-            <VerticalStackLayout Padding="18,16" Spacing="14">
+            <VerticalStackLayout Padding="18,16" Spacing="14" HorizontalOptions="Center"
+                                  MaximumWidthRequest="480">
 
                 <!-- Search row: look up any place, or jump back to my location -->
                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
@@ -34,7 +35,8 @@
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
                                 <Grid Padding="14,11">
-                                    <Label Text="{Binding Display}" TextColor="{StaticResource Ink}" FontSize="16" />
+                                    <Label Text="{Binding Display}" TextColor="{StaticResource Ink}" FontSize="16"
+                                           LineBreakMode="TailTruncation" MaxLines="1" />
                                 </Grid>
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
@@ -42,25 +44,28 @@
                 </Border>
 
                 <!-- Status badge + freshness note -->
-                <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,6,0,0">
-                    <Border x:Name="BadgeBorder" StrokeShape="RoundRectangle 10" StrokeThickness="0"
-                            BackgroundColor="#3FB36B" Padding="10,3">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,6,0,0">
+                    <Border Grid.Column="0" x:Name="BadgeBorder" StrokeShape="RoundRectangle 10" StrokeThickness="0"
+                            BackgroundColor="#3FB36B" Padding="10,3" VerticalOptions="Center">
                         <Label x:Name="BadgeLabel" Text="LIVE" TextColor="#06210F" FontSize="11"
                                FontAttributes="Bold" />
                     </Border>
-                    <Label x:Name="NoteLabel" Text="" TextColor="{StaticResource InkSoft}" FontSize="13"
-                           VerticalOptions="Center" />
-                </HorizontalStackLayout>
+                    <Label Grid.Column="1" x:Name="NoteLabel" Text="" TextColor="{StaticResource InkSoft}" FontSize="13"
+                           VerticalOptions="Center" LineBreakMode="WordWrap" MaxLines="2" />
+                </Grid>
 
                 <!-- Hero readout -->
                 <Label x:Name="EmojiLabel" Text="☀️" FontSize="76" HorizontalOptions="Center" />
                 <Label x:Name="TempLabel" Text="—" FontSize="96" HorizontalOptions="Center"
                        TextColor="{StaticResource Ink}" />
                 <Label x:Name="DescLabel" Text="" FontSize="22" HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" LineBreakMode="WordWrap"
                        TextColor="{StaticResource Ink}" />
                 <Label x:Name="QuipLabel" Text="" FontSize="15" FontAttributes="Bold" HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" LineBreakMode="WordWrap"
                        TextColor="{StaticResource Ink}" Opacity="0.95" />
                 <Label x:Name="PlaceLabel" Text="" FontSize="15" HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" LineBreakMode="WordWrap"
                        TextColor="{StaticResource InkSoft}" />
 
                 <!-- Stats tiles -->
@@ -119,12 +124,15 @@
                                     BackgroundColor="{StaticResource Glass}" Padding="10,10" WidthRequest="62">
                                 <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
                                     <Label Text="{Binding Day}" FontSize="11" FontAttributes="Bold"
-                                           TextColor="{StaticResource Ink}" HorizontalOptions="Center" />
+                                           TextColor="{StaticResource Ink}" HorizontalOptions="Center"
+                                           LineBreakMode="TailTruncation" MaxLines="1" />
                                     <Label Text="{Binding Emoji}" FontSize="22" HorizontalOptions="Center" />
                                     <Label Text="{Binding Hi}" FontSize="14" FontAttributes="Bold"
-                                           TextColor="{StaticResource Ink}" HorizontalOptions="Center" />
+                                           TextColor="{StaticResource Ink}" HorizontalOptions="Center"
+                                           LineBreakMode="TailTruncation" MaxLines="1" />
                                     <Label Text="{Binding Lo}" FontSize="12"
-                                           TextColor="{StaticResource InkSoft}" HorizontalOptions="Center" />
+                                           TextColor="{StaticResource InkSoft}" HorizontalOptions="Center"
+                                           LineBreakMode="TailTruncation" MaxLines="1" />
                                     <Border StrokeShape="RoundRectangle 6" StrokeThickness="0"
                                             BackgroundColor="{Binding UvColor}" Padding="5,1" HorizontalOptions="Center">
                                         <Label Text="{Binding Uv}" FontSize="9" FontAttributes="Bold" TextColor="#0C1322" />
@@ -146,9 +154,11 @@
                             <Border StrokeShape="RoundRectangle 14" Stroke="{StaticResource GlassEdge}"
                                     BackgroundColor="{StaticResource Glass}" Padding="14,8">
                                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
-                                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center">
-                                        <Label Text="{Binding Location.Name}" TextColor="{StaticResource Ink}" FontSize="14" />
-                                        <Label Text="{Binding ShortLine}" TextColor="{StaticResource InkSoft}" FontSize="12" />
+                                    <VerticalStackLayout Grid.Column="0" VerticalOptions="Center" MaximumWidthRequest="160">
+                                        <Label Text="{Binding Location.Name}" TextColor="{StaticResource Ink}" FontSize="14"
+                                               LineBreakMode="TailTruncation" MaxLines="1" />
+                                        <Label Text="{Binding ShortLine}" TextColor="{StaticResource InkSoft}" FontSize="12"
+                                               LineBreakMode="TailTruncation" MaxLines="1" />
                                     </VerticalStackLayout>
                                     <Button Grid.Column="1" Text="✕" FontSize="12" WidthRequest="26" HeightRequest="26"
                                             Padding="0" CornerRadius="13" VerticalOptions="Center"

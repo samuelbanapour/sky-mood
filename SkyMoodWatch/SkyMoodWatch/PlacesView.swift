@@ -20,9 +20,13 @@ struct PlacesView: View {
                     } label: {
                         HStack {
                             Text(place.name)
-                            Spacer()
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Spacer(minLength: 8)
                             Text("\(WeatherReading.display(place.tempC, fahrenheit: model.isFahrenheit))°")
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .layoutPriority(1)
                         }
                     }
                 }
