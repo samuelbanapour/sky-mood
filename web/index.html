@@ -84,6 +84,10 @@
   .place{font-size:clamp(14px,4vw,18px);opacity:.9;margin:4px 0 22px}
   .place .dot{opacity:.5;margin:0 8px}
 
+  /* Without an explicit width, #weather (a column-flex item) shrinks-to-fit its widest child —
+     the 7-day strip (~494px) — pushing every section off both screen edges on phones. Pinning it
+     to the viewport lets .days actually scroll instead of dictating the layout width. */
+  #weather{width:100%;max-width:560px}
   .stats{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:560px;width:100%}
   .stat{flex:1 1 calc(50% - 12px);min-width:130px;background:var(--glass);border:1px solid var(--edge);
     backdrop-filter:blur(10px);border-radius:18px;padding:14px 18px;text-align:left}
@@ -119,6 +123,25 @@
   .footer .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;opacity:.85}
   .footer .pip{width:8px;height:8px;border-radius:50%;background:#5dff8f;box-shadow:0 0 8px #5dff8f;animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* "install this as an app" hint — shown once to visitors who aren't already installed */
+  /* centered via left/right+margin, not transform — the fadeUp animation (fill-mode both)
+     would otherwise clobber a translateX(-50%) with its own final transform */
+  .install{position:fixed;left:0;right:0;margin:0 auto;width:fit-content;
+    bottom:max(74px,calc(env(safe-area-inset-bottom) + 66px));
+    z-index:4;display:flex;align-items:center;gap:12px;max-width:min(92vw,420px);
+    background:rgba(10,20,40,.92);border:1px solid var(--edge);border-radius:16px;
+    padding:12px 14px;backdrop-filter:blur(10px);box-shadow:0 8px 30px rgba(0,0,0,.35);
+    animation:fadeUp .7s ease both;text-align:left;text-shadow:none}
+  .install .emoji{font-size:26px;flex:0 0 auto}
+  .install .txt{font-size:13px;line-height:1.45}
+  .install .txt b{font-weight:700}
+  .install .txt .shareico{display:inline-block;width:1em;height:1em;vertical-align:-.12em}
+  .install button.go{flex:0 0 auto;background:var(--glass);color:#fff;border:1px solid var(--edge);
+    border-radius:14px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .install .x{flex:0 0 auto;width:22px;height:22px;line-height:20px;text-align:center;border-radius:50%;
+    font-size:14px;opacity:.6;cursor:pointer;background:rgba(255,255,255,.12)}
+  .install .x:hover{opacity:1}
 
   .spinner{width:52px;height:52px;margin:60px auto 18px;border:4px solid rgba(255,255,255,.3);
     border-top-color:#fff;border-radius:50%;animation:spin .9s linear infinite}
@@ -204,6 +227,14 @@
     <a class="plink" href="/privacy">Privacy</a>
   </div>
 
+  <!-- install hint: iOS gets Add-to-Home-Screen instructions, Chromium gets the real install prompt -->
+  <div id="installHint" class="install hidden" role="dialog" aria-label="Install Sky Mood">
+    <span class="emoji">📲</span>
+    <span class="txt" id="installTxt"></span>
+    <button class="go hidden" id="installGo">Install</button>
+    <span class="x" id="installX" role="button" aria-label="Dismiss">✕</span>
+  </div>
+
 <script>
 const WX = {
   0:{l:"Clear sky",e:"☀️",s:"clear"},1:{l:"Mainly clear",e:"🌤️",s:"fewclouds"},2:{l:"Partly cloudy",e:"⛅",s:"fewclouds"},
@@ -263,7 +294,7 @@ async function loadWeather(loc){
   try{
     const r=await fetch(url); if(!r.ok) throw new Error("http "+r.status);
     const j=await r.json();
-    const reading={loc,cur:j.current,daily:j.daily,at:Date.now()};
+    const reading={loc,cur:j.current,daily:j.daily,at:Date.now(),utcOffsetSeconds:j.utc_offset_seconds};
     cacheSave(reading);
     if(!loc.name) loc.name=await reverseName(loc.lat,loc.lon)||`${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`;
     render(reading,"LIVE","Live");
@@ -287,7 +318,7 @@ function render(reading,badge,note){
   $("desc").textContent=info.l+(day?"":" · night");
   $("quip").textContent=quipFor(info,cur.temperature_2m,day);
   $("place").textContent=loc.name||`${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`;
-  $("time").textContent="as of "+new Date(reading.at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  $("time").textContent=localTimeText(reading.utcOffsetSeconds);
   $("feels").textContent=toDisp(cur.apparent_temperature)+"°";
   $("hum").textContent=(cur.relative_humidity_2m??"--")+"%";
   $("wind").textContent=Math.round(cur.wind_speed_10m)+" km/h";
@@ -353,13 +384,19 @@ function removePlace(loc){
   try{localStorage.removeItem(LS+".wx."+keyFor(loc));}catch(e){}
   buildChips();
 }
+// Local time at the place, computed from the raw UTC offset Open-Meteo returned with the last
+// fetch — not an IANA zone lookup, so it stays correct without needing tzdata for every place.
+function localTimeText(offsetSeconds){
+  if(offsetSeconds==null) return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  return new Date(Date.now()+offsetSeconds*1000).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",timeZone:"UTC"});
+}
 function buildChips(){
   const places=getPlaces(); const wrap=$("savedWrap"),chips=$("chips");
   if(!places.length){wrap.classList.add("hidden");return;}
   wrap.classList.remove("hidden"); chips.innerHTML="";
   places.forEach(p=>{
     const c=cacheGet(p); const div=document.createElement("div"); div.className="chip";
-    const t=c?`${toDisp(c.cur.temperature_2m)}° ${emojiFor(WX[c.cur.weather_code]||WX[0], c.cur.is_day===1)}`:"tap to load";
+    const t=c?`${toDisp(c.cur.temperature_2m)}° ${emojiFor(WX[c.cur.weather_code]||WX[0], c.cur.is_day===1)} · ${localTimeText(c.utcOffsetSeconds)}`:"tap to load";
     div.innerHTML=`<b>${p.name||"Place"}</b><span>${t}</span><span class="x" role="button" aria-label="Remove ${p.name||"place"}" title="Remove">✕</span>`;
     div.onclick=()=>{state.celebrate=true;loadWeather(p);};
     div.querySelector(".x").onclick=e=>{e.stopPropagation();removePlace(p);};
@@ -473,6 +510,40 @@ function _loop(){_tx+=(_px-_tx)*.08;_ty+=(_py-_ty)*.08;_scene.style.transform=`t
 function setParallax(nx,ny){_px=nx*16;_py=ny*16;if(!_raf)_loop();}
 addEventListener("mousemove",e=>setParallax(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5));
 addEventListener("deviceorientation",e=>{if(e.gamma!=null)setParallax(Math.max(-1,Math.min(1,e.gamma/45)),Math.max(-1,Math.min(1,((e.beta||45)-45)/45)));});
+
+// ---------- "install this as an app" hint ----------
+// Shown once (until dismissed) to visitors who aren't already running the installed app.
+// iOS Safari has no install API, so it gets Add-to-Home-Screen instructions; Chromium
+// browsers get a real Install button wired to the beforeinstallprompt event.
+let _bip=null;
+addEventListener("beforeinstallprompt",e=>{e.preventDefault();_bip=e;setupInstallHint();});
+function _installed(){return matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;}
+function setupInstallHint(){
+  try{if(localStorage.getItem(LS+".installHintDismissed"))return;}catch(e){}
+  if(_installed())return;
+  const hint=$("installHint"),txt=$("installTxt"),go=$("installGo");
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(_bip){
+    txt.innerHTML="<b>Get Sky Mood as an app</b> — free, no app store needed.";
+    go.classList.remove("hidden");
+    go.onclick=async()=>{const p=_bip;_bip=null;dismissInstallHint();if(p){p.prompt();try{await p.userChoice;}catch(e){}}};
+  }else if(ios){
+    // Only Safari can add to home screen on iOS — other iOS browsers can't, so don't mislead.
+    const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/.test(navigator.userAgent);
+    if(!safari)return;
+    txt.innerHTML="<b>Get Sky Mood as an app:</b> tap "+
+      "<svg class=\"shareico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"Share\"><path d=\"M12 3v12\"/><path d=\"M8 7l4-4 4 4\"/><path d=\"M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8\"/></svg>"+
+      " below, then <b>Add to Home Screen</b>.";
+  }else return;
+  hint.classList.remove("hidden");
+  $("installX").onclick=dismissInstallHint;
+}
+function dismissInstallHint(){
+  $("installHint").classList.add("hidden");
+  try{localStorage.setItem(LS+".installHintDismissed","1");}catch(e){}
+}
+// Delayed so the hint doesn't compete with the first weather load.
+setTimeout(setupInstallHint,4000);
 
 function boot(){
   buildChips();
