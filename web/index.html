@@ -953,9 +953,15 @@ addEventListener("pointerup",()=>{_mapScrubDragging=false;});
 function boot(){
   buildChips();
   // Shareable deep links: ?q=City or ?lat=..&lon=..&name=.. open straight to that place.
+  // ?openMap=1 additionally jumps straight to the satellite/weather map once that place's
+  // weather has loaded — used by the native app's WebView to embed just the map screen.
   const p=new URLSearchParams(location.search);
-  const q=p.get("q"), lat=p.get("lat"), lon=p.get("lon");
-  if(lat&&lon){ loadWeather({name:p.get("name")||"",admin:"",country:p.get("country")||"",lat:+lat,lon:+lon}); return; }
+  const q=p.get("q"), lat=p.get("lat"), lon=p.get("lon"), wantMap=p.get("openMap")==="1";
+  if(lat&&lon){
+    loadWeather({name:p.get("name")||"",admin:"",country:p.get("country")||"",lat:+lat,lon:+lon})
+      .then(()=>{ if(wantMap)openMap(); });
+    return;
+  }
   if(q){ geocode(q).then(r=>{ if(r[0]) loadWeather(r[0]); else useGeo(false); }); return; }
   useGeo(false);
 }
