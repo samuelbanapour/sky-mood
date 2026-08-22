@@ -267,7 +267,7 @@ stages:
                 dotnet build "$APP" -c Release -p:Heads=ios -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 \
                   -p:ApplicationDisplayVersion=$(displayVersion) -p:ApplicationVersion=$(buildNum) \
                   -p:ArchiveOnBuild=true -p:BuildIpa=true \
-                  -p:CodesignKey="$IOS_SIGNING_IDENTITY" -p:CodesignProvision="$IOS_PROVISIONING_PROFILE_NAME"
+                  -p:CodesignKey="$SKYMOOD_CODESIGN_KEY" -p:CodesignProvision="$SKYMOOD_CODESIGN_PROVISION"
                 ipa=$(find "$HOME/.skymood-build/SkyMood.App/bin/Release/net10.0-ios/ios-arm64" -maxdepth 1 -name '*.ipa' | head -1)
                 if [ -z "$ipa" ]; then echo "No signed .ipa under bin/"; exit 1; fi
                 cp "$ipa" "$(Build.ArtifactStagingDirectory)/ipa/SkyMood-$(displayVersion).ipa"
@@ -287,8 +287,14 @@ stages:
             displayName: Build .ipa (signed if a certificate was imported, else unsigned compile-check)
             env:
               SIGNED: $(signed)
-              IOS_SIGNING_IDENTITY: $(IOS_SIGNING_IDENTITY)
-              IOS_PROVISIONING_PROFILE_NAME: $(IOS_PROVISIONING_PROFILE_NAME)
+              # Named SKYMOOD_* rather than IOS_SIGNING_IDENTITY/IOS_PROVISIONING_PROFILE_NAME —
+              # .NET-for-iOS's own SDK targets read an env var literally named
+              # IOS_SIGNING_IDENTITY as a signing trigger independent of -p:CodesignKey, so merely
+              # exporting it (even empty, even in the unsigned branch that never references it)
+              # made a plain unsigned compile-check build fail with "code signing key
+              # '$(IOS_SIGNING_IDENTITY)' not found in keychain". Renaming avoids the collision.
+              SKYMOOD_CODESIGN_KEY: $(IOS_SIGNING_IDENTITY)
+              SKYMOOD_CODESIGN_PROVISION: $(IOS_PROVISIONING_PROFILE_NAME)
               KEYCHAIN_PATH: $(keychainPath)
           - publish: $(Build.ArtifactStagingDirectory)/ipa
             artifact: skymood-ios-ipa
