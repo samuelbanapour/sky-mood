@@ -362,6 +362,7 @@
   </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0" crossorigin=""></script>
 <script>
 const WX = {
   0:{l:"Clear sky",e:"☀️",s:"clear"},1:{l:"Mainly clear",e:"🌤️",s:"fewclouds"},2:{l:"Partly cloudy",e:"⛅",s:"fewclouds"},
@@ -674,12 +675,13 @@ setTimeout(setupInstallHint,4000);
 
 // ---------- satellite/weather map ----------
 // Esri World Imagery (satellite) and CARTO Voyager (standard) — free, no key.
-// RainViewer's public maps API — free, no key — powers Precipitation + the scrubber.
-// Temperature/Wind use OpenWeatherMap's free-tier tile layers (needs a free key from
-// openweathermap.org/api). Their Air Pollution API is free too but returns point JSON, not
-// tiles, so Air Quality shows as a numeric badge on the pin (like Apple Weather's own badge)
-// instead of faking a colored overlay OWM doesn't actually offer on the free tier.
-const OWM_API_KEY="6a88ff92e88a8fffbe19733666d996c8";
+// RainViewer's public maps API — free, no key — supplies real radar imagery for the recent
+// past (it has no future data at all; radar only observes the present). Everything else —
+// the future portion of Precipitation, and the entire Temperature/Wind/Air Quality timelines
+// — comes from Open-Meteo (the same free, keyless source the rest of the app already uses),
+// sampled across a grid of points and rendered as a heatmap via Leaflet.heat. This keeps the
+// whole map feature free forever with no account, key, or paid tier anywhere.
+const MAP_GRID_N=7; // 7×7 = 49 sample points per layer, one batched request
 
 let _map=null,_mapMarker=null,_mapSatLayer=null,_mapStdLayer=null,_mapOverlayLayer=null,_mapAqi=null;
 let _mapLayerKey="precipitation",_mapPlaying=false,_mapPlayTimer=null;
@@ -687,13 +689,19 @@ let _mapFrames=[],_mapFrameIdx=-1,_mapNowIdx=-1,_mapScrubDragging=false;
 const MAP_DEFAULT_CENTER=[51.5074,-0.1278]; // London — same fallback used elsewhere in the app
 
 const MAP_LAYERS={
-  precipitation:{label:"Precipitation",icon:"☔",kind:"rainviewer",
-    legend:{title:"Precipitation",stops:[["#c10000","Extreme"],["#ffaa00","Heavy"],["#0091ca","Moderate"],["#88ddee","Light"]]}},
-  temperature:{label:"Temperature",icon:"🌡️",kind:"owm",owmLayer:"temp_new",
-    legend:{title:"Temperature",stops:[["#d53e4f","Hot"],["#fdae61","Warm"],["#abdda4","Mild"],["#3288bd","Cold"]]}},
-  wind:{label:"Wind",icon:"💨",kind:"owm",owmLayer:"wind_new",
-    legend:{title:"Wind speed",stops:[["#4575b4","Strong"],["#74add1","Windy"],["#abd9e9","Breezy"],["#e0f3f8","Calm"]]}},
-  airquality:{label:"Air Quality",icon:"🍃",kind:"aqi",legend:null},
+  precipitation:{label:"Precipitation",icon:"☔",variable:"precipitation",heatMax:8,
+    legend:{title:"Precipitation",stops:[["#c10000","Extreme"],["#ffaa00","Heavy"],["#0091ca","Moderate"],["#88ddee","Light"]]},
+    heatGradient:{0.0:"#88ddee",0.35:"#0091ca",0.7:"#ffaa00",1.0:"#c10000"}},
+  temperature:{label:"Temperature",icon:"🌡️",variable:"temperature_2m",heatMin:-10,heatMax:40,
+    legend:{title:"Temperature",stops:[["#d53e4f","Hot"],["#fdae61","Warm"],["#abdda4","Mild"],["#3288bd","Cold"]]},
+    heatGradient:{0.0:"#3288bd",0.4:"#abdda4",0.7:"#fdae61",1.0:"#d53e4f"}},
+  wind:{label:"Wind",icon:"💨",variable:"wind_speed_10m",heatMax:60,
+    legend:{title:"Wind speed",stops:[["#4575b4","Strong"],["#74add1","Windy"],["#abd9e9","Breezy"],["#e0f3f8","Calm"]]},
+    heatGradient:{0.0:"#e0f3f8",0.35:"#abd9e9",0.7:"#74add1",1.0:"#4575b4"}},
+  airquality:{label:"Air Quality",icon:"🍃",variable:"us_aqi",heatMax:150,aqi:true,
+    // EPA's official US AQI category colors — not an invented scale.
+    legend:{title:"Air Quality Index",stops:[["#ff0000","Unhealthy"],["#ff7e00","Sensitive"],["#ffff00","Moderate"],["#00e400","Good"]]},
+    heatGradient:{0.0:"#00e400",0.33:"#ffff00",0.66:"#ff7e00",1.0:"#ff0000"}},
 };
 
 // ---------- pin bubble (temp + condition, plus an AQI badge when that layer is active) ----------
@@ -769,51 +777,135 @@ function setActiveLayer(key){
   _mapAqi=null;updateMapPin();
   renderLegend(def);
   $("mapScrubber").classList.remove("show");
-  if(def.kind==="rainviewer")loadRadarFrames();
-  else if(def.kind==="owm")loadOwmLayer(def);
-  else if(def.kind==="aqi")loadAqi();
+  _mapFrames=[];_mapFrameIdx=-1;_mapNowIdx=-1;
+  if(key==="precipitation")loadPrecipitationFrames();
+  else loadHeatFrames(def);
 }
 function renderLegend(def){
-  if(!def.legend){$("mapLegend").classList.remove("show");return;}
   $("mapLegend").classList.add("show");
   $("mapLegendTitle").textContent=def.legend.title;
   $("mapLegendGrad").style.background=`linear-gradient(${def.legend.stops.map(s=>s[0]).join(",")})`;
   $("mapLegendLabels").innerHTML=def.legend.stops.map(s=>`<span>${s[1]}</span>`).join("");
   $("mapLegendNote").style.display="none";
 }
+function legendError(msg){
+  $("mapLegendNote").style.display="block";
+  $("mapLegendNote").textContent=msg;
+}
 
-// ---------- Precipitation (RainViewer) + scrubber ----------
-async function loadRadarFrames(){
+// ---------- shared grid sampling (Open-Meteo, free/keyless) ----------
+function mapGridPoints(n){
+  const b=_map.getBounds();
+  const s=b.getSouth(),w=b.getWest(),latSpan=b.getNorth()-s,lonSpan=b.getEast()-w;
+  const pts=[];
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)pts.push({lat:s+latSpan*(i+0.5)/n,lon:w+lonSpan*(j+0.5)/n});
+  return pts;
+}
+async function fetchGrid(def,points){
+  const lats=points.map(p=>p.lat.toFixed(3)).join(","),lons=points.map(p=>p.lon.toFixed(3)).join(",");
+  const base=def.aqi?"https://air-quality-api.open-meteo.com/v1/air-quality":"https://api.open-meteo.com/v1/forecast";
+  const url=`${base}?latitude=${lats}&longitude=${lons}&hourly=${def.variable}&past_hours=2&forecast_hours=24`;
+  const r=await fetch(url);
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const arr=await r.json();
+  const list=Array.isArray(arr)?arr:[arr];
+  // Open-Meteo times are plain UTC ISO strings (no offset suffix) — append Z so Date parses
+  // them as UTC rather than the browser's local zone.
+  return list.map((loc,i)=>({lat:points[i].lat,lon:points[i].lon,
+    times:loc.hourly.time.map(t=>Math.floor(new Date(t+"Z").getTime()/1000)),
+    values:loc.hourly[def.variable]}));
+}
+function buildHeatFrames(grid){
+  const times=grid[0].times;
+  return times.map((t,ti)=>({time:t,kind:"heat",points:grid.map(g=>[g.lat,g.lon,g.values[ti]])}));
+}
+function normalize(def,v){
+  if(v==null)return 0;
+  const lo=def.heatMin||0,hi=def.heatMax;
+  return Math.max(0,Math.min(1,(v-lo)/(hi-lo)));
+}
+function aqiColor(aqi){
+  if(aqi<=50)return"#00e400";if(aqi<=100)return"#ffff00";if(aqi<=150)return"#ff7e00";
+  if(aqi<=200)return"#ff0000";if(aqi<=300)return"#8f3f97";return"#7e0023";
+}
+
+// ---------- Precipitation: real radar for the past, Open-Meteo heatmap for the future ----------
+async function loadPrecipitationFrames(){
+  let radarFrames=[];
   try{
     const r=await fetch("https://api.rainviewer.com/public/weather-maps.json");
     const j=await r.json();
-    const past=(j.radar&&j.radar.past)||[],nowcast=(j.radar&&j.radar.nowcast)||[];
-    _mapFrames=[...past,...nowcast].map(f=>({time:f.time,path:f.path,host:j.host}));
-    _mapNowIdx=Math.max(0,past.length-1);
-    if(!_mapFrames.length)return;
+    radarFrames=((j.radar&&j.radar.past)||[]).map(f=>({time:f.time,kind:"radar",host:j.host,path:f.path}));
+  }catch(e){}
+  _mapNowIdx=Math.max(0,radarFrames.length-1);
+  let heatFrames=[];
+  try{
+    const grid=await fetchGrid(MAP_LAYERS.precipitation,mapGridPoints(MAP_GRID_N));
+    const lastRadarTime=radarFrames.length?radarFrames[radarFrames.length-1].time:Math.floor(Date.now()/1000);
+    heatFrames=buildHeatFrames(grid).filter(f=>f.time>lastRadarTime);
+  }catch(e){}
+  _mapFrames=[...radarFrames,...heatFrames];
+  if(!_mapFrames.length){legendError("Couldn't load radar or forecast data right now — try again in a moment.");return;}
+  showFrame(_mapNowIdx>=0?_mapNowIdx:0);
+  buildScrubberTicks();
+  $("mapScrubber").classList.add("show");
+}
+
+// ---------- Temperature / Wind / Air Quality: past+future Open-Meteo heatmap ----------
+async function loadHeatFrames(def){
+  try{
+    const grid=await fetchGrid(def,mapGridPoints(MAP_GRID_N));
+    _mapFrames=buildHeatFrames(grid);
+    if(!_mapFrames.length){legendError("Couldn't load forecast data right now — try again in a moment.");return;}
+    const nowT=Date.now()/1000;
+    _mapNowIdx=_mapFrames.reduce((best,f,i)=>Math.abs(f.time-nowT)<Math.abs(_mapFrames[best].time-nowT)?i:best,0);
     showFrame(_mapNowIdx);
     buildScrubberTicks();
     $("mapScrubber").classList.add("show");
-  }catch(e){_mapFrames=[];}
+  }catch(e){legendError("Couldn't load forecast data right now — try again in a moment.");}
 }
+
+// ---------- rendering + scrubber ----------
 function showFrame(i){
   if(!_mapFrames.length)return;
   i=Math.max(0,Math.min(_mapFrames.length-1,i));
   _mapFrameIdx=i;
   const f=_mapFrames[i];
-  if(_mapOverlayLayer)_map.removeLayer(_mapOverlayLayer);
-  // RainViewer's radar tiles only exist natively up to z=7 — maxNativeZoom keeps them
-  // visible (upscaled) at closer map zooms instead of showing "Zoom Level Not Supported".
-  _mapOverlayLayer=L.tileLayer(`${f.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
-    {opacity:.65,maxZoom:19,maxNativeZoom:7,attribution:"Radar &copy; RainViewer"}).addTo(_map);
+  if(_mapOverlayLayer){_map.removeLayer(_mapOverlayLayer);_mapOverlayLayer=null;}
+  if(f.kind==="radar"){
+    // RainViewer's radar tiles only exist natively up to z=7 — maxNativeZoom keeps them
+    // visible (upscaled) at closer map zooms instead of showing "Zoom Level Not Supported".
+    _mapOverlayLayer=L.tileLayer(`${f.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
+      {opacity:.65,maxZoom:19,maxNativeZoom:7,attribution:"Radar &copy; RainViewer"}).addTo(_map);
+  }else{
+    const def=MAP_LAYERS[_mapLayerKey];
+    const heatPts=f.points.map(([lat,lon,v])=>[lat,lon,normalize(def,v)]);
+    // Leaflet.heat scales each point's intensity by 1/2^(maxZoom-currentZoom) before
+    // drawing — with a sparse 7x7 grid and maxZoom set higher than the map's actual zoom,
+    // that crushed every point to near-zero alpha (invisible). maxZoom:8 keeps intensity at
+    // full strength for zoom 8+ (the map opens at 10), only attenuating if zoomed out further.
+    // radius/blur sized generously so adjacent 7×7 grid points' blobs overlap and blend
+    // into a continuous surface instead of rendering as visibly separate dots.
+    _mapOverlayLayer=L.heatLayer(heatPts,{radius:75,blur:45,maxZoom:8,max:1,gradient:def.heatGradient,
+      attribution:"Forecast &copy; Open-Meteo"}).addTo(_map);
+    if(_mapLayerKey==="airquality"){
+      const loc=state.loc;
+      if(loc){
+        let best=f.points[0],bd=Infinity;
+        for(const p of f.points){const d=(p[0]-loc.lat)**2+(p[1]-loc.lon)**2;if(d<bd){bd=d;best=p;}}
+        if(best){_mapAqi={value:Math.round(best[2]),color:aqiColor(best[2])};updateMapPin();}
+      }
+    }
+  }
   updateScrubberUI();
 }
 function buildScrubberTicks(){
   const n=_mapFrames.length;
-  // sparse labels (first/now/last) — mirrors Apple's sparse hour labels rather than one per 10-min frame
   const showAt=new Set([0,_mapNowIdx,n-1]);
+  const step=Math.max(1,Math.round(n/6));
+  for(let i=0;i<n;i+=step)showAt.add(i);
   $("mapScrubTicks").innerHTML=_mapFrames.map((f,i)=>showAt.has(i)?
-    `<span>${i===_mapNowIdx?"Now":new Date(f.time*1000).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span>`:"<span></span>").join("");
+    `<span>${i===_mapNowIdx?"Now":new Date(f.time*1000).toLocaleTimeString([],{hour:"numeric",minute:i<_mapNowIdx?"2-digit":undefined})}</span>`:"<span></span>").join("");
 }
 function updateScrubberUI(){
   if(!_mapFrames.length)return;
@@ -825,7 +917,8 @@ function updateScrubberUI(){
   $("mapScrubNow").style.left=nowPct+"%";
   const label=new Date(f.time*1000).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
   const rel=_mapFrameIdx<_mapNowIdx?" · past":_mapFrameIdx>_mapNowIdx?" · forecast":"";
-  $("mapScrubWhen").textContent=(_mapFrameIdx===_mapNowIdx?"Radar · Now":"Radar · "+label)+rel;
+  const name=MAP_LAYERS[_mapLayerKey].label;
+  $("mapScrubWhen").textContent=(_mapFrameIdx===_mapNowIdx?`${name} · Now`:`${name} · ${label}`)+rel;
   $("mapPlayBtn").textContent=_mapPlaying?"⏸":"▶";
 }
 function togglePlay(){_mapPlaying?stopPlay():startPlay();}
@@ -843,68 +936,6 @@ function scrubTo(clientX){
   const r=$("mapScrubTrack").getBoundingClientRect();
   const pct=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
   showFrame(Math.round(pct*(_mapFrames.length-1)));
-}
-
-// ---------- Temperature / Wind (OpenWeatherMap tiles) ----------
-function loadOwmLayer(def){
-  if(!OWM_API_KEY){
-    $("mapLegendNote").style.display="block";
-    $("mapLegendNote").textContent="Add a free API key from openweathermap.org/api to OWM_API_KEY in the code to enable this layer.";
-    return;
-  }
-  _mapOverlayLayer=L.tileLayer(`https://tile.openweathermap.org/map/${def.owmLayer}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
-    {opacity:.6,maxZoom:19,attribution:"&copy; OpenWeatherMap"}).addTo(_map);
-  // A brand-new key 401s until OWM activates it (their dashboard warns this can take up to
-  // 2 hours) — surface that in the legend instead of leaving a silently-blank overlay.
-  let _owmErrored=false;
-  _mapOverlayLayer.on("tileerror",()=>{
-    if(_owmErrored)return;_owmErrored=true;
-    $("mapLegendNote").style.display="block";
-    $("mapLegendNote").textContent="Couldn't load this layer — if this key was just created, OpenWeatherMap can take up to 2 hours to activate a new key.";
-  });
-}
-
-// ---------- Air Quality (OpenWeatherMap Air Pollution API — point data, shown as a pin badge) ----------
-async function loadAqi(){
-  if(!OWM_API_KEY){
-    $("mapLegend").classList.add("show");
-    $("mapLegendTitle").textContent="Air Quality";
-    $("mapLegendGrad").style.background="none";
-    $("mapLegendLabels").innerHTML="";
-    $("mapLegendNote").style.display="block";
-    $("mapLegendNote").textContent="Add a free API key from openweathermap.org/api to OWM_API_KEY in the code to enable this.";
-    return;
-  }
-  const loc=state.loc;if(!loc)return;
-  try{
-    const r=await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${loc.lat}&lon=${loc.lon}&appid=${OWM_API_KEY}`);
-    // fetch() only rejects on network failure, not on HTTP error statuses — OWM still
-    // returns a 200-shaped JSON body (with a "cod" error field) for a 401, so this must be
-    // checked explicitly or a bad/inactive key fails silently instead of hitting the catch below.
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    const j=await r.json();
-    const aqi=j.list&&j.list[0]&&j.list[0].main&&j.list[0].main.aqi;
-    if(!aqi)throw new Error("no aqi in response");
-    const AQI_LABELS=["","Good","Fair","Moderate","Poor","Very Poor"];
-    const AQI_COLORS=["","#3fb36b","#a8c93a","#e0a33a","#e0703a","#c0392b"];
-    _mapAqi={value:aqi,color:AQI_COLORS[aqi]};
-    updateMapPin();
-    $("mapLegend").classList.add("show");
-    $("mapLegendTitle").textContent="Air Quality Index";
-    $("mapLegendGrad").style.background="none";
-    $("mapLegendLabels").innerHTML="";
-    $("mapLegendNote").style.display="block";
-    $("mapLegendNote").textContent=`${AQI_LABELS[aqi]} (${aqi}/5) at this location — OpenWeatherMap's free tier gives point data here, not a colored map layer.`;
-  }catch(e){
-    // Most likely cause: a brand-new OWM key — their own dashboard warns new keys can take
-    // up to 2 hours to activate, so a 401 here doesn't mean the wiring is wrong.
-    $("mapLegend").classList.add("show");
-    $("mapLegendTitle").textContent="Air Quality";
-    $("mapLegendGrad").style.background="none";
-    $("mapLegendLabels").innerHTML="";
-    $("mapLegendNote").style.display="block";
-    $("mapLegendNote").textContent="Couldn't load air quality — if this key was just created, OpenWeatherMap can take up to 2 hours to activate a new key.";
-  }
 }
 
 $("mapBtn").onclick=openMap;
