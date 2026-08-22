@@ -42,6 +42,7 @@ public partial class MainPage : ContentPage
         SearchBtn.Clicked += async (_, _) => await DoSearchAsync();
         SearchEntry.Completed += async (_, _) => await DoSearchAsync();
         LocateBtn.Clicked += async (_, _) => await UseMyLocationAsync();
+        MapBtn.Clicked += async (_, _) => await Navigation.PushModalAsync(new MapPage(_current?.Location ?? _location));
         RefreshBtn.Clicked += async (_, _) => await RefreshAsync();
         UnitBtn.Clicked += (_, _) => ToggleUnit();
         ResultsList.SelectionChanged += OnResultSelected;

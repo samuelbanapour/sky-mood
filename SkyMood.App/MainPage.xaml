@@ -12,8 +12,8 @@
             <VerticalStackLayout Padding="18,16" Spacing="14" HorizontalOptions="Center"
                                   MaximumWidthRequest="480">
 
-                <!-- Search row: look up any place, or jump back to my location -->
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <!-- Search row: look up any place, jump back to my location, or open the satellite map -->
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                     <Border Grid.Column="0" StrokeShape="RoundRectangle 22"
                             Stroke="{StaticResource GlassEdge}" BackgroundColor="{StaticResource Glass}"
                             Padding="14,0">
@@ -24,6 +24,9 @@
                     <Button Grid.Column="1" x:Name="SearchBtn" Text="Search" CornerRadius="22"
                             BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}" Padding="14,0" />
                     <Button Grid.Column="2" x:Name="LocateBtn" Text="📍" CornerRadius="22"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}"
+                            WidthRequest="46" Padding="0" />
+                    <Button Grid.Column="3" x:Name="MapBtn" Text="🛰️" CornerRadius="22"
                             BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}"
                             WidthRequest="46" Padding="0" />
                 </Grid>

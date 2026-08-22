@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SkyMood.App.MapPage"
+             BackgroundColor="#0A1428">
+
+    <!--
+        Embeds the web edition's satellite/weather map (Leaflet layers, legend, scrubber) via a
+        WebView rather than reimplementing it natively — that map is actively maintained on the
+        web side, so this stays current automatically instead of becoming a second copy to keep
+        in sync. The page opens straight to the map (?openMap=1) for the app's current location.
+    -->
+    <Grid>
+        <WebView x:Name="Map" />
+
+        <!-- The web page has its own map-close button, but that only hides its map overlay and
+             reveals the redundant full weather UI underneath — this native close reliably exits
+             the whole screen regardless of what state the web page is in. Placed top-right so it
+             doesn't visually stack with the web map's own top-left close button. -->
+        <Button x:Name="CloseBtn" Text="✕" HorizontalOptions="End" VerticalOptions="Start"
+                Margin="0,44,14,0" WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
+                BackgroundColor="White" TextColor="#111111" />
+    </Grid>
+
+</ContentPage>
