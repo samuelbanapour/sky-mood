@@ -10,6 +10,7 @@
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/site.webmanifest" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
   :root{
     --fg:#fff; --sky-top:#2d83d6; --sky-bot:#7ec8f5;
@@ -173,6 +174,92 @@
   .chip:active{transform:scale(.94)}
   .bar button:active,.footer button:active{transform:scale(.92)}
   .live{cursor:pointer;user-select:none}
+
+  /* ---------- satellite/weather map — Apple-Weather-style layer picker + legend + scrubber ---------- */
+  #mapOverlay{position:fixed;inset:0;z-index:20;background:#0A1428;display:flex;flex-direction:column}
+  /* Leaflet's own CSS gives .leaflet-container position:relative but no z-index, so its
+     internal panes (z-index 200-700+) aren't contained in their own stacking context and
+     leak out to cover the topbar/legend/scrubber. z-index:1 here scopes them. */
+  #mapView{flex:1;width:100%;position:relative;z-index:1}
+  #mapView .leaflet-tile-pane{filter:saturate(1.05)}
+
+  .map-topbar{position:absolute;top:0;left:0;right:0;z-index:22;display:flex;align-items:flex-start;
+    justify-content:space-between;gap:10px;padding:max(14px,env(safe-area-inset-top)) 14px 14px;
+    background:linear-gradient(rgba(0,0,0,.45),transparent);pointer-events:none}
+  .map-topbar>*{pointer-events:auto}
+  .map-topbar .x{width:38px;height:38px;flex:0 0 auto;border-radius:50%;border:none;
+    background:#fff;color:#111;font-size:16px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  .map-topleft{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .map-seg{display:flex;background:rgba(10,20,40,.75);border:1px solid var(--edge);border-radius:20px;
+    padding:3px;backdrop-filter:blur(10px)}
+  .map-seg button{border:none;background:transparent;color:#fff;opacity:.7;font-size:12px;font-weight:600;
+    border-radius:17px;padding:6px 12px;cursor:pointer}
+  .map-seg button.active{background:var(--glass);opacity:1}
+
+  /* layer picker: a pill button that opens an Apple-Weather-style dropdown list */
+  .map-layer{position:relative}
+  .map-layerbtn{display:flex;align-items:center;gap:7px;border:1px solid var(--edge);border-radius:20px;
+    background:rgba(10,20,40,.75);color:#fff;font-size:13px;font-weight:600;padding:8px 12px 8px 14px;
+    cursor:pointer;backdrop-filter:blur(10px)}
+  .map-layerbtn .chev{opacity:.6;font-size:10px;transition:transform .2s}
+  .map-layerbtn.open .chev{transform:rotate(180deg)}
+  .map-layermenu{position:absolute;top:calc(100% + 8px);right:0;min-width:210px;background:rgba(16,28,48,.96);
+    border:1px solid var(--edge);border-radius:16px;padding:6px;backdrop-filter:blur(14px);
+    box-shadow:0 10px 30px rgba(0,0,0,.4);display:none}
+  .map-layermenu.open{display:block}
+  .map-layermenu button{width:100%;display:flex;align-items:center;gap:10px;border:none;background:none;
+    color:#fff;font-size:14px;text-align:left;padding:10px 10px;border-radius:10px;cursor:pointer}
+  .map-layermenu button:hover{background:rgba(255,255,255,.08)}
+  .map-layermenu button .ic{width:20px;text-align:center;font-size:15px}
+  .map-layermenu button .ck{margin-left:auto;opacity:0;font-size:13px}
+  .map-layermenu button.active .ck{opacity:1}
+  .map-layermenu .unavail{font-size:11px;opacity:.55;margin-left:30px;margin-top:-6px;padding-bottom:6px}
+
+  /* legend: bottom-left card, mirrors Apple's vertical gradient key */
+  .map-legend{position:absolute;left:14px;bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px));z-index:21;
+    background:rgba(10,20,40,.8);border:1px solid var(--edge);border-radius:14px;padding:12px 14px;
+    backdrop-filter:blur(10px);display:none}
+  .map-legend.show{display:block}
+  .map-legend .lt{font-size:12px;font-weight:700;margin-bottom:8px}
+  .map-legend .bar{display:flex;gap:8px}
+  .map-legend .grad{width:6px;border-radius:3px}
+  .map-legend .labels{display:flex;flex-direction:column;justify-content:space-between;font-size:11px;opacity:.85}
+
+  /* pin bubble: replaces the default Leaflet marker with a temp+icon bubble like Apple's */
+  .map-pin{display:flex;flex-direction:column;align-items:center;pointer-events:none}
+  .map-pin .bubble{width:56px;height:56px;border-radius:50%;background:#2d83d6;border:3px solid #fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;
+    color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);position:relative}
+  .map-pin .bubble .n{font-size:16px;font-weight:800}
+  .map-pin .bubble .i{font-size:14px;margin-top:2px}
+  /* AQI badge: small circular number pinned to the bubble's corner, mirrors Apple's own AQI badge */
+  .map-pin .bubble .aqi{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;
+    background:#555;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;
+    justify-content:center;border:2px solid #0A1428}
+  .map-pin .bubble::after{content:"";position:absolute;bottom:-9px;left:50%;margin-left:-7px;
+    width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;
+    border-top:9px solid #fff}
+  .map-pin .lbl{margin-top:10px;font-size:12px;font-weight:700;background:rgba(10,20,40,.75);
+    padding:3px 9px;border-radius:10px;backdrop-filter:blur(8px)}
+
+  /* bottom scrubber: play/pause + timeline, mirrors Apple's forecast bar */
+  .map-scrubber{position:absolute;left:14px;right:14px;bottom:max(14px,env(safe-area-inset-bottom));z-index:21;
+    display:none;align-items:center;gap:12px;background:rgba(10,20,40,.85);border:1px solid var(--edge);
+    border-radius:18px;padding:10px 14px;backdrop-filter:blur(12px)}
+  .map-scrubber.show{display:flex}
+  .map-scrubber .play{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:none;
+    background:rgba(255,255,255,.14);color:#fff;font-size:13px;cursor:pointer}
+  .map-scrubber .mid{flex:1;min-width:0}
+  .map-scrubber .mid .when{font-size:12px;font-weight:700}
+  .map-scrubber .track{position:relative;height:22px;margin-top:4px;cursor:pointer}
+  .map-scrubber .track .line{position:absolute;top:9px;left:0;right:0;height:3px;border-radius:2px;
+    background:rgba(255,255,255,.25)}
+  .map-scrubber .track .line .fill{height:100%;border-radius:2px;background:#2d83d6}
+  .map-scrubber .track .now{position:absolute;top:6px;width:2px;height:9px;background:#ffb700}
+  .map-scrubber .track .thumb{position:absolute;top:3px;width:15px;height:15px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4);transform:translateX(-50%)}
+  .map-scrubber .ticks{display:flex;justify-content:space-between;font-size:9px;opacity:.6;margin-top:2px}
+  .leaflet-control-attribution{font-size:9px!important}
 </style>
 </head>
 <body>
@@ -185,6 +272,7 @@
       <input id="search" type="search" placeholder="Search a city…" autocomplete="off" />
       <button id="searchBtn">Search</button>
       <button id="locateBtn" class="icon" title="My location">📍</button>
+      <button id="mapBtn" class="icon" title="Satellite map">🛰️</button>
       <div id="results"></div>
     </div>
 
@@ -221,6 +309,44 @@
     </div>
   </div>
 
+  <!-- satellite/weather map: Satellite/Standard basemap + Apple-Weather-style layer picker -->
+  <div id="mapOverlay" class="hidden">
+    <div class="map-topbar">
+      <div class="map-topleft">
+        <span class="x" id="mapClose" role="button" aria-label="Close map">✕</span>
+        <div class="map-seg">
+          <button id="mapSatBtn" class="active">Satellite</button>
+          <button id="mapStdBtn">Standard</button>
+        </div>
+      </div>
+      <div class="map-layer">
+        <button class="map-layerbtn" id="mapLayerBtn"><span id="mapLayerIcon">☔</span><span id="mapLayerLabel">Precipitation</span><span class="chev">▾</span></button>
+        <div class="map-layermenu" id="mapLayerMenu"></div>
+      </div>
+    </div>
+    <div id="mapView"></div>
+    <div class="map-legend" id="mapLegend">
+      <div class="lt" id="mapLegendTitle">Precipitation</div>
+      <div class="bar">
+        <div class="grad" id="mapLegendGrad"></div>
+        <div class="labels" id="mapLegendLabels"></div>
+      </div>
+      <div class="unavail" id="mapLegendNote" style="display:none;margin-top:8px"></div>
+    </div>
+    <div class="map-scrubber" id="mapScrubber">
+      <button class="play" id="mapPlayBtn">▶</button>
+      <div class="mid">
+        <div class="when" id="mapScrubWhen">—</div>
+        <div class="track" id="mapScrubTrack">
+          <div class="line"><div class="fill" id="mapScrubFill"></div></div>
+          <div class="now" id="mapScrubNow"></div>
+          <div class="thumb" id="mapScrubThumb"></div>
+        </div>
+        <div class="ticks" id="mapScrubTicks"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="footer">
     <span class="live"><span class="pip"></span> Sky Mood · web edition</span>
     <button id="refreshBtn">↻ Refresh</button>
@@ -235,6 +361,7 @@
     <span class="x" id="installX" role="button" aria-label="Dismiss">✕</span>
   </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 const WX = {
   0:{l:"Clear sky",e:"☀️",s:"clear"},1:{l:"Mainly clear",e:"🌤️",s:"fewclouds"},2:{l:"Partly cloudy",e:"⛅",s:"fewclouds"},
@@ -544,6 +671,252 @@ function dismissInstallHint(){
 }
 // Delayed so the hint doesn't compete with the first weather load.
 setTimeout(setupInstallHint,4000);
+
+// ---------- satellite/weather map ----------
+// Esri World Imagery (satellite) and CARTO Voyager (standard) — free, no key.
+// RainViewer's public maps API — free, no key — powers Precipitation + the scrubber.
+// Temperature/Wind use OpenWeatherMap's free-tier tile layers (needs a free key from
+// openweathermap.org/api). Their Air Pollution API is free too but returns point JSON, not
+// tiles, so Air Quality shows as a numeric badge on the pin (like Apple Weather's own badge)
+// instead of faking a colored overlay OWM doesn't actually offer on the free tier.
+const OWM_API_KEY="6a88ff92e88a8fffbe19733666d996c8";
+
+let _map=null,_mapMarker=null,_mapSatLayer=null,_mapStdLayer=null,_mapOverlayLayer=null,_mapAqi=null;
+let _mapLayerKey="precipitation",_mapPlaying=false,_mapPlayTimer=null;
+let _mapFrames=[],_mapFrameIdx=-1,_mapNowIdx=-1,_mapScrubDragging=false;
+const MAP_DEFAULT_CENTER=[51.5074,-0.1278]; // London — same fallback used elsewhere in the app
+
+const MAP_LAYERS={
+  precipitation:{label:"Precipitation",icon:"☔",kind:"rainviewer",
+    legend:{title:"Precipitation",stops:[["#c10000","Extreme"],["#ffaa00","Heavy"],["#0091ca","Moderate"],["#88ddee","Light"]]}},
+  temperature:{label:"Temperature",icon:"🌡️",kind:"owm",owmLayer:"temp_new",
+    legend:{title:"Temperature",stops:[["#d53e4f","Hot"],["#fdae61","Warm"],["#abdda4","Mild"],["#3288bd","Cold"]]}},
+  wind:{label:"Wind",icon:"💨",kind:"owm",owmLayer:"wind_new",
+    legend:{title:"Wind speed",stops:[["#4575b4","Strong"],["#74add1","Windy"],["#abd9e9","Breezy"],["#e0f3f8","Calm"]]}},
+  airquality:{label:"Air Quality",icon:"🍃",kind:"aqi",legend:null},
+};
+
+// ---------- pin bubble (temp + condition, plus an AQI badge when that layer is active) ----------
+function mapPinHtml(){
+  const d=state.data;
+  if(!d) return `<span class="n">--</span>`;
+  const info=WX[d.cur.weather_code]||WX[0],day=d.cur.is_day===1;
+  return `<span class="n">${toDisp(d.cur.temperature_2m)}°</span><span class="i">${emojiFor(info,day)}</span>`;
+}
+function mapPinIcon(){
+  const badge=(_mapAqi&&_mapLayerKey==="airquality")?`<span class="aqi" style="background:${_mapAqi.color}">${_mapAqi.value}</span>`:"";
+  return L.divIcon({className:"",html:`<div class="map-pin"><div class="bubble">${mapPinHtml()}${badge}</div></div>`,iconSize:[56,80],iconAnchor:[28,80]});
+}
+function updateMapPin(){if(_mapMarker)_mapMarker.setIcon(mapPinIcon());}
+
+function initMap(){
+  if(_map)return;
+  _map=L.map("mapView",{zoomControl:false,fadeAnimation:false}).setView(MAP_DEFAULT_CENTER,9);
+  L.control.zoom({position:"bottomright"}).addTo(_map);
+  _mapSatLayer=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {maxZoom:19,attribution:"Tiles &copy; Esri"});
+  _mapStdLayer=L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    {maxZoom:19,subdomains:"abcd",attribution:"&copy; OpenStreetMap &copy; CARTO"});
+  _mapSatLayer.addTo(_map);
+  _mapMarker=L.marker(MAP_DEFAULT_CENTER,{icon:mapPinIcon(),zIndexOffset:1000}).addTo(_map);
+  buildLayerMenu();
+  setActiveLayer("precipitation");
+}
+function openMap(){
+  $("mapOverlay").classList.remove("hidden");
+  initMap();
+  updateMapPin();
+  const loc=state.loc,c=loc?[loc.lat,loc.lon]:MAP_DEFAULT_CENTER;
+  _map.setView(c,10);
+  _mapMarker.setLatLng(c);
+  // the container was display:none until just now, so Leaflet measured it as 0×0 — nudge it
+  // to re-measure once the unhide has actually painted.
+  setTimeout(()=>_map.invalidateSize(),50);
+}
+function closeMap(){$("mapOverlay").classList.add("hidden");stopPlay();}
+function setMapBase(which){
+  const wantSat=which==="satellite";
+  if(wantSat){if(_map.hasLayer(_mapStdLayer))_map.removeLayer(_mapStdLayer);if(!_map.hasLayer(_mapSatLayer))_mapSatLayer.addTo(_map);}
+  else{if(_map.hasLayer(_mapSatLayer))_map.removeLayer(_mapSatLayer);if(!_map.hasLayer(_mapStdLayer))_mapStdLayer.addTo(_map);}
+  $("mapSatBtn").classList.toggle("active",wantSat);
+  $("mapStdBtn").classList.toggle("active",!wantSat);
+}
+
+// ---------- layer picker dropdown ----------
+function buildLayerMenu(){
+  const menu=$("mapLayerMenu");
+  menu.innerHTML=Object.entries(MAP_LAYERS).map(([key,def])=>
+    `<button data-key="${key}" class="${key===_mapLayerKey?"active":""}">
+      <span class="ic">${def.icon}</span><span>${def.label}</span><span class="ck">✓</span>
+    </button>`).join("");
+  menu.querySelectorAll("button").forEach(b=>b.onclick=()=>{setActiveLayer(b.dataset.key);toggleLayerMenu(false);});
+}
+function toggleLayerMenu(force){
+  const open=force!==undefined?force:!$("mapLayerMenu").classList.contains("open");
+  $("mapLayerMenu").classList.toggle("open",open);
+  $("mapLayerBtn").classList.toggle("open",open);
+}
+
+// ---------- active layer switching ----------
+function setActiveLayer(key){
+  const def=MAP_LAYERS[key];if(!def)return;
+  _mapLayerKey=key;
+  $("mapLayerIcon").textContent=def.icon;
+  $("mapLayerLabel").textContent=def.label;
+  [...$("mapLayerMenu").querySelectorAll("button")].forEach(b=>b.classList.toggle("active",b.dataset.key===key));
+  stopPlay();
+  if(_mapOverlayLayer){_map.removeLayer(_mapOverlayLayer);_mapOverlayLayer=null;}
+  _mapAqi=null;updateMapPin();
+  renderLegend(def);
+  $("mapScrubber").classList.remove("show");
+  if(def.kind==="rainviewer")loadRadarFrames();
+  else if(def.kind==="owm")loadOwmLayer(def);
+  else if(def.kind==="aqi")loadAqi();
+}
+function renderLegend(def){
+  if(!def.legend){$("mapLegend").classList.remove("show");return;}
+  $("mapLegend").classList.add("show");
+  $("mapLegendTitle").textContent=def.legend.title;
+  $("mapLegendGrad").style.background=`linear-gradient(${def.legend.stops.map(s=>s[0]).join(",")})`;
+  $("mapLegendLabels").innerHTML=def.legend.stops.map(s=>`<span>${s[1]}</span>`).join("");
+  $("mapLegendNote").style.display="none";
+}
+
+// ---------- Precipitation (RainViewer) + scrubber ----------
+async function loadRadarFrames(){
+  try{
+    const r=await fetch("https://api.rainviewer.com/public/weather-maps.json");
+    const j=await r.json();
+    const past=(j.radar&&j.radar.past)||[],nowcast=(j.radar&&j.radar.nowcast)||[];
+    _mapFrames=[...past,...nowcast].map(f=>({time:f.time,path:f.path,host:j.host}));
+    _mapNowIdx=Math.max(0,past.length-1);
+    if(!_mapFrames.length)return;
+    showFrame(_mapNowIdx);
+    buildScrubberTicks();
+    $("mapScrubber").classList.add("show");
+  }catch(e){_mapFrames=[];}
+}
+function showFrame(i){
+  if(!_mapFrames.length)return;
+  i=Math.max(0,Math.min(_mapFrames.length-1,i));
+  _mapFrameIdx=i;
+  const f=_mapFrames[i];
+  if(_mapOverlayLayer)_map.removeLayer(_mapOverlayLayer);
+  // RainViewer's radar tiles only exist natively up to z=7 — maxNativeZoom keeps them
+  // visible (upscaled) at closer map zooms instead of showing "Zoom Level Not Supported".
+  _mapOverlayLayer=L.tileLayer(`${f.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
+    {opacity:.65,maxZoom:19,maxNativeZoom:7,attribution:"Radar &copy; RainViewer"}).addTo(_map);
+  updateScrubberUI();
+}
+function buildScrubberTicks(){
+  const n=_mapFrames.length;
+  // sparse labels (first/now/last) — mirrors Apple's sparse hour labels rather than one per 10-min frame
+  const showAt=new Set([0,_mapNowIdx,n-1]);
+  $("mapScrubTicks").innerHTML=_mapFrames.map((f,i)=>showAt.has(i)?
+    `<span>${i===_mapNowIdx?"Now":new Date(f.time*1000).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span>`:"<span></span>").join("");
+}
+function updateScrubberUI(){
+  if(!_mapFrames.length)return;
+  const f=_mapFrames[_mapFrameIdx];
+  const denom=Math.max(1,_mapFrames.length-1);
+  const pct=(_mapFrameIdx/denom)*100,nowPct=(_mapNowIdx/denom)*100;
+  $("mapScrubFill").style.width=pct+"%";
+  $("mapScrubThumb").style.left=pct+"%";
+  $("mapScrubNow").style.left=nowPct+"%";
+  const label=new Date(f.time*1000).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+  const rel=_mapFrameIdx<_mapNowIdx?" · past":_mapFrameIdx>_mapNowIdx?" · forecast":"";
+  $("mapScrubWhen").textContent=(_mapFrameIdx===_mapNowIdx?"Radar · Now":"Radar · "+label)+rel;
+  $("mapPlayBtn").textContent=_mapPlaying?"⏸":"▶";
+}
+function togglePlay(){_mapPlaying?stopPlay():startPlay();}
+function startPlay(){
+  if(!_mapFrames.length)return;
+  _mapPlaying=true;$("mapPlayBtn").textContent="⏸";
+  _mapPlayTimer=setInterval(()=>{showFrame(_mapFrameIdx+1>=_mapFrames.length?0:_mapFrameIdx+1);},600);
+}
+function stopPlay(){
+  _mapPlaying=false;clearInterval(_mapPlayTimer);_mapPlayTimer=null;
+  $("mapPlayBtn").textContent="▶";
+}
+function scrubTo(clientX){
+  if(!_mapFrames.length)return;
+  const r=$("mapScrubTrack").getBoundingClientRect();
+  const pct=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+  showFrame(Math.round(pct*(_mapFrames.length-1)));
+}
+
+// ---------- Temperature / Wind (OpenWeatherMap tiles) ----------
+function loadOwmLayer(def){
+  if(!OWM_API_KEY){
+    $("mapLegendNote").style.display="block";
+    $("mapLegendNote").textContent="Add a free API key from openweathermap.org/api to OWM_API_KEY in the code to enable this layer.";
+    return;
+  }
+  _mapOverlayLayer=L.tileLayer(`https://tile.openweathermap.org/map/${def.owmLayer}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
+    {opacity:.6,maxZoom:19,attribution:"&copy; OpenWeatherMap"}).addTo(_map);
+  // A brand-new key 401s until OWM activates it (their dashboard warns this can take up to
+  // 2 hours) — surface that in the legend instead of leaving a silently-blank overlay.
+  let _owmErrored=false;
+  _mapOverlayLayer.on("tileerror",()=>{
+    if(_owmErrored)return;_owmErrored=true;
+    $("mapLegendNote").style.display="block";
+    $("mapLegendNote").textContent="Couldn't load this layer — if this key was just created, OpenWeatherMap can take up to 2 hours to activate a new key.";
+  });
+}
+
+// ---------- Air Quality (OpenWeatherMap Air Pollution API — point data, shown as a pin badge) ----------
+async function loadAqi(){
+  if(!OWM_API_KEY){
+    $("mapLegend").classList.add("show");
+    $("mapLegendTitle").textContent="Air Quality";
+    $("mapLegendGrad").style.background="none";
+    $("mapLegendLabels").innerHTML="";
+    $("mapLegendNote").style.display="block";
+    $("mapLegendNote").textContent="Add a free API key from openweathermap.org/api to OWM_API_KEY in the code to enable this.";
+    return;
+  }
+  const loc=state.loc;if(!loc)return;
+  try{
+    const r=await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${loc.lat}&lon=${loc.lon}&appid=${OWM_API_KEY}`);
+    // fetch() only rejects on network failure, not on HTTP error statuses — OWM still
+    // returns a 200-shaped JSON body (with a "cod" error field) for a 401, so this must be
+    // checked explicitly or a bad/inactive key fails silently instead of hitting the catch below.
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    const aqi=j.list&&j.list[0]&&j.list[0].main&&j.list[0].main.aqi;
+    if(!aqi)throw new Error("no aqi in response");
+    const AQI_LABELS=["","Good","Fair","Moderate","Poor","Very Poor"];
+    const AQI_COLORS=["","#3fb36b","#a8c93a","#e0a33a","#e0703a","#c0392b"];
+    _mapAqi={value:aqi,color:AQI_COLORS[aqi]};
+    updateMapPin();
+    $("mapLegend").classList.add("show");
+    $("mapLegendTitle").textContent="Air Quality Index";
+    $("mapLegendGrad").style.background="none";
+    $("mapLegendLabels").innerHTML="";
+    $("mapLegendNote").style.display="block";
+    $("mapLegendNote").textContent=`${AQI_LABELS[aqi]} (${aqi}/5) at this location — OpenWeatherMap's free tier gives point data here, not a colored map layer.`;
+  }catch(e){
+    // Most likely cause: a brand-new OWM key — their own dashboard warns new keys can take
+    // up to 2 hours to activate, so a 401 here doesn't mean the wiring is wrong.
+    $("mapLegend").classList.add("show");
+    $("mapLegendTitle").textContent="Air Quality";
+    $("mapLegendGrad").style.background="none";
+    $("mapLegendLabels").innerHTML="";
+    $("mapLegendNote").style.display="block";
+    $("mapLegendNote").textContent="Couldn't load air quality — if this key was just created, OpenWeatherMap can take up to 2 hours to activate a new key.";
+  }
+}
+
+$("mapBtn").onclick=openMap;
+$("mapClose").onclick=closeMap;
+$("mapSatBtn").onclick=()=>setMapBase("satellite");
+$("mapStdBtn").onclick=()=>setMapBase("standard");
+$("mapLayerBtn").onclick=()=>toggleLayerMenu();
+document.addEventListener("click",e=>{if(!e.target.closest(".map-layer"))toggleLayerMenu(false);});
+$("mapPlayBtn").onclick=togglePlay;
+$("mapScrubTrack").addEventListener("pointerdown",e=>{_mapScrubDragging=true;stopPlay();scrubTo(e.clientX);});
+addEventListener("pointermove",e=>{if(_mapScrubDragging)scrubTo(e.clientX);});
+addEventListener("pointerup",()=>{_mapScrubDragging=false;});
 
 function boot(){
   buildChips();
