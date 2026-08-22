@@ -80,7 +80,7 @@ public partial class MainPage : ContentPage
         // Ticks the displayed local-time-at-location clock without re-fetching weather data.
         _clockTimer = Dispatcher.CreateTimer();
         _clockTimer.Interval = TimeSpan.FromSeconds(30);
-        _clockTimer.Tick += (_, _) => { if (_current is not null) UpdatePlaceLabel(_current); };
+        _clockTimer.Tick += (_, _) => { if (_current is not null) UpdatePlaceLabel(_current); BuildPlaces(); };
         _clockTimer.Start();
     }
 
@@ -359,7 +359,7 @@ public partial class MainPage : ContentPage
     void BuildPlaces()
     {
         var tiles = _weather.CachedPlaces()
-            .Select(r => new PlaceTile(r.Location, $"{Temp(r.Reading.TempC)}  {r.Reading.Visual.Label}"))
+            .Select(r => new PlaceTile(r.Location, $"{Temp(r.Reading.TempC)}  {r.Reading.Visual.Label}  ·  {LocalTimeText(r.Reading)}"))
             .ToList();
         PlacesList.ItemsSource = tiles;
     }

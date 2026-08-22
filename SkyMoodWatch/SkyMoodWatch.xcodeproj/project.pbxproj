@@ -7,14 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05E433CC1D00FC2C7BF6F5A9 /* WatchSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E14AB498AB359AE1F9D45741 /* WatchSessionManager.swift */; };
 		6AB236453483C1710D81B1A1 /* SkyMoodWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 553F5B91A7D51CCC4A266546 /* SkyMoodWatchApp.swift */; };
 		797EE6FA28F68F6A9DD24331 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00293F0B79AA432DC309DD /* ContentView.swift */; };
 		80DAAA7994827BDF55D0C466 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5AA44F44DABA1F1F92AA32BF /* Assets.xcassets */; };
 		A7E4915245D70CF764E1A125 /* WeatherCodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E80E9F6D520DCA802EA3E6 /* WeatherCodes.swift */; };
+		ACA90958DE97266C19C63E80 /* PlacesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19527EF286B44D0B5CAAB18B /* PlacesView.swift */; };
 		E5E12A267D45EDEFC0CB5AE6 /* WeatherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF74A3D2903A2DDDB40C3BA /* WeatherModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		19527EF286B44D0B5CAAB18B /* PlacesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesView.swift; sourceTree = "<group>"; };
 		32E80E9F6D520DCA802EA3E6 /* WeatherCodes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherCodes.swift; sourceTree = "<group>"; };
 		4DF74A3D2903A2DDDB40C3BA /* WeatherModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherModel.swift; sourceTree = "<group>"; };
 		553F5B91A7D51CCC4A266546 /* SkyMoodWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyMoodWatchApp.swift; sourceTree = "<group>"; };
@@ -22,6 +25,7 @@
 		7157AC73F1D92C31577240BE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AB00293F0B79AA432DC309DD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BA163EB4C0C762D98BF89959 /* SkyMoodWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SkyMoodWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E14AB498AB359AE1F9D45741 /* WatchSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -31,7 +35,9 @@
 				5AA44F44DABA1F1F92AA32BF /* Assets.xcassets */,
 				AB00293F0B79AA432DC309DD /* ContentView.swift */,
 				7157AC73F1D92C31577240BE /* Info.plist */,
+				19527EF286B44D0B5CAAB18B /* PlacesView.swift */,
 				553F5B91A7D51CCC4A266546 /* SkyMoodWatchApp.swift */,
+				E14AB498AB359AE1F9D45741 /* WatchSessionManager.swift */,
 				32E80E9F6D520DCA802EA3E6 /* WeatherCodes.swift */,
 				4DF74A3D2903A2DDDB40C3BA /* WeatherModel.swift */,
 			);
@@ -126,7 +132,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				797EE6FA28F68F6A9DD24331 /* ContentView.swift in Sources */,
+				ACA90958DE97266C19C63E80 /* PlacesView.swift in Sources */,
 				6AB236453483C1710D81B1A1 /* SkyMoodWatchApp.swift in Sources */,
+				05E433CC1D00FC2C7BF6F5A9 /* WatchSessionManager.swift in Sources */,
 				A7E4915245D70CF764E1A125 /* WeatherCodes.swift in Sources */,
 				E5E12A267D45EDEFC0CB5AE6 /* WeatherModel.swift in Sources */,
 			);
@@ -199,7 +207,7 @@
 				DEVELOPMENT_TEAM = K56M484768;
 				ENABLE_PREVIEWS = NO;
 				INFOPLIST_FILE = SkyMoodWatch/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.gamedevsolo.skymoodwatch;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gamedevsolo.skymood.watchkitapp;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -278,7 +286,7 @@
 				DEVELOPMENT_TEAM = K56M484768;
 				ENABLE_PREVIEWS = NO;
 				INFOPLIST_FILE = SkyMoodWatch/Info.plist;
-				PRODUCT_BUNDLE_IDENTIFIER = com.gamedevsolo.skymoodwatch;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gamedevsolo.skymood.watchkitapp;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;

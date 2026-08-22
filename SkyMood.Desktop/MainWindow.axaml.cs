@@ -66,7 +66,7 @@ public partial class MainWindow : Window
 
             // Ticks the displayed local-time-at-location clock without re-fetching weather data.
             _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
-            _clock.Tick += (_, _) => { if (_current is not null) UpdatePlaceText(_current); };
+            _clock.Tick += (_, _) => { if (_current is not null) UpdatePlaceText(_current); BuildPlaces(); };
             _clock.Start();
         };
     }
@@ -195,7 +195,7 @@ public partial class MainWindow : Window
         {
             var stack = new StackPanel();
             stack.Children.Add(new TextBlock { Text = r.Location.Name, Foreground = Brushes.White, FontSize = 14, Margin = new Thickness(0, 0, 14, 0) });
-            stack.Children.Add(new TextBlock { Text = $"{Temp(r.Reading.TempC)}  {r.Reading.Visual.Label}", Foreground = new SolidColorBrush(Color.Parse("#CCDCE6F5")), FontSize = 12 });
+            stack.Children.Add(new TextBlock { Text = $"{Temp(r.Reading.TempC)}  {r.Reading.Visual.Label}  ·  {LocalTimeText(r.Reading)}", Foreground = new SolidColorBrush(Color.Parse("#CCDCE6F5")), FontSize = 12 });
             var tile = new Button
             {
                 Content = stack, Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),

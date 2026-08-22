@@ -22,7 +22,7 @@
 	<string>Sky Mood uses your location to show local weather.</string>
 	<key>WKApplication</key>
 	<true/>
-	<key>WKWatchOnly</key>
-	<true/>
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>com.gamedevsolo.skymood</string>
 </dict>
 </plist>
