@@ -131,7 +131,11 @@ jobs:
       - name: Install MAUI Windows workload
         run: dotnet workload install maui-windows
       - name: Build Windows (unpackaged)
-        run: dotnet build $env:APP -c $env:BUILD_CONFIG -p:Heads=windows -p:WindowsPackageType=None
+        # RuntimeIdentifier must be explicit: the csproj only declares the candidate list
+        # (RuntimeIdentifiers=win-x64;win-arm64), and WindowsAppSDK's self-contained targets
+        # (WindowsPackageType=None implies self-contained) fail with "requires a supported
+        # Windows architecture" if `dotnet build` never resolves that list down to one RID.
+        run: dotnet build $env:APP -c $env:BUILD_CONFIG -p:Heads=windows -p:WindowsPackageType=None -p:RuntimeIdentifier=win-x64
       - uses: actions/upload-artifact@v4
         with:
           # Whole output folder (exe + its DLLs/runtime), so the artifact is actually runnable.
