@@ -1,0 +1,81 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mapsui="clr-namespace:Mapsui.UI.Avalonia;assembly=Mapsui.UI.Avalonia"
+        x:Class="SkyMood.Desktop.MapWindow"
+        Title="Sky Mood — Map" Width="440" Height="820" MinWidth="360" MinHeight="600"
+        Icon="/Assets/skymood.ico" Background="#0A1428">
+
+    <!--
+        Native satellite/weather map (Mapsui — free, open-source, no API key), mirroring
+        SkyMood.App's MapPage: Satellite/Standard basemap toggle, a Precipitation/Temperature/
+        Wind/Air Quality layer picker, a legend, and a past/future scrubber. Same free data
+        sources as the MAUI and web editions (Esri/CARTO tiles, RainViewer radar, Open-Meteo
+        forecast grid). Colors are hardcoded to match SkyMood.App's Glass/GlassEdge/Ink/InkSoft
+        resource values (#33121A2E/#44FFFFFF/#FFFFFFFF/#CCDCE6F5) since this project styles
+        directly rather than through a named resource dictionary — see MainWindow.axaml.
+    -->
+    <Grid>
+        <mapsui:MapControl Name="Map" />
+
+        <!-- top bar -->
+        <Grid Margin="14,14,14,0" VerticalAlignment="Top" ColumnDefinitions="Auto,*,Auto">
+            <StackPanel Grid.Column="0" Spacing="8">
+                <Button Name="CloseBtn" Content="✕" Width="38" Height="38" Padding="0"
+                        CornerRadius="19" Background="White" Foreground="#111111" />
+                <StackPanel Orientation="Horizontal" Background="#BF0A1428">
+                    <Button Name="SatBtn" Content="Satellite" FontSize="12" CornerRadius="17" Padding="12,6"
+                            Background="#33121A2E" Foreground="White" />
+                    <Button Name="StdBtn" Content="Standard" FontSize="12" CornerRadius="17" Padding="12,6"
+                            Background="Transparent" Foreground="White" Opacity="0.7" />
+                </StackPanel>
+            </StackPanel>
+
+            <Grid Grid.Column="2" HorizontalAlignment="Right">
+                <Button Name="LayerBtn" Content="Precipitation" FontSize="13" CornerRadius="20" Padding="14,8"
+                        Background="#BF0A1428" Foreground="White" />
+                <Border Name="LayerMenu" IsVisible="False" VerticalAlignment="Top" Margin="0,46,0,0"
+                        CornerRadius="16" BorderBrush="#44FFFFFF" BorderThickness="1"
+                        Background="#F5101C30" Padding="6" Width="200">
+                    <StackPanel Name="LayerMenuItems" Spacing="2" />
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- legend -->
+        <Border Name="Legend" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="14,0,0,96"
+                CornerRadius="14" BorderBrush="#44FFFFFF" BorderThickness="1"
+                Background="#CC0A1428" Padding="12,10">
+            <StackPanel Spacing="8">
+                <TextBlock Name="LegendTitle" Text="Precipitation" FontSize="12" FontWeight="Bold"
+                           Foreground="White" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Name="LegendGrad" Width="6" Height="72" CornerRadius="3" />
+                    <StackPanel Name="LegendLabels" Spacing="2" />
+                </StackPanel>
+                <TextBlock Name="LegendNote" IsVisible="False" FontSize="11" Foreground="#CCDCE6F5"
+                           Width="180" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- scrubber -->
+        <Border VerticalAlignment="Bottom" Margin="14,0,14,14" CornerRadius="18"
+                BorderBrush="#44FFFFFF" BorderThickness="1" Background="#D90A1428" Padding="12,10">
+            <Grid ColumnDefinitions="Auto,*">
+                <Button Grid.Column="0" Name="PlayBtn" Content="▶" Width="34" Height="34"
+                        Padding="0" CornerRadius="17" Background="#33121A2E" Foreground="White" />
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Name="ScrubWhen" Text="—" FontSize="12" FontWeight="Bold" Foreground="White" />
+                    <Slider Name="ScrubSlider" Minimum="0" Maximum="1" Margin="0,2,0,0" />
+                    <Grid Name="ScrubTicks" ColumnDefinitions="*,*,*" Margin="4,0">
+                        <TextBlock Grid.Column="0" Name="TickStart" FontSize="9" Foreground="#CCDCE6F5" />
+                        <TextBlock Grid.Column="1" Name="TickNow" FontSize="9" Foreground="#CCDCE6F5"
+                                   HorizontalAlignment="Center" Text="Now" />
+                        <TextBlock Grid.Column="2" Name="TickEnd" FontSize="9" Foreground="#CCDCE6F5"
+                                   HorizontalAlignment="Right" />
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+
+</Window>

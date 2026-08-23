@@ -21,12 +21,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.2.1" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.2.1" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.1" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.1" />
+    <PackageReference Include="Avalonia" Version="11.3.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.1" />
     <!-- Override Avalonia's transitive 0.20.0 (GHSA-xrw6-gwf8-vvr9, signal spoofing); 0.21.3 is the backported patch. -->
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+    <!-- Native satellite/weather map (mirrors SkyMood.App's MapPage) — same versions as the MAUI
+         head's Mapsui.Maui/Mapsui.Nts references, just the Avalonia-hosted MapControl instead. -->
+    <PackageReference Include="Mapsui.Avalonia" Version="5.1.0" />
+    <PackageReference Include="Mapsui.Nts" Version="5.1.0" />
   </ItemGroup>
 
   <ItemGroup>

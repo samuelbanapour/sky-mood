@@ -32,14 +32,15 @@
         <Grid Margin="18" RowDefinitions="Auto,*,Auto">
 
             <!-- search row -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto">
                 <TextBox Name="SearchBox" Grid.Column="0" Watermark="Search a city…"
                          Background="#26FFFFFF" Foreground="White" BorderBrush="#44FFFFFF"
                          CornerRadius="20" Padding="14,8" VerticalContentAlignment="Center" />
                 <Button Name="SearchBtn" Grid.Column="1" Classes="glass" Content="Search" Margin="8,0,0,0" />
                 <Button Name="LocateBtn" Grid.Column="2" Classes="glass" Content="📍" Margin="8,0,0,0" />
+                <Button Name="MapBtn" Grid.Column="3" Classes="glass" Content="🛰️" Margin="8,0,0,0" />
 
-                <Border Name="ResultsCard" Grid.Column="0" Grid.ColumnSpan="3" ZIndex="20"
+                <Border Name="ResultsCard" Grid.Column="0" Grid.ColumnSpan="4" ZIndex="20"
                         VerticalAlignment="Top" Margin="0,48,0,0" IsVisible="False"
                         Background="#F00E1A30" BorderBrush="#44FFFFFF" BorderThickness="1" CornerRadius="14">
                     <ScrollViewer MaxHeight="240">

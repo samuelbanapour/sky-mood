@@ -48,6 +48,10 @@ public partial class MainWindow : Window
         SearchBtn.Click += async (_, _) => await DoSearch();
         SearchBox.KeyDown += async (_, e) => { if (e.Key == Key.Enter) await DoSearch(); };
         LocateBtn.Click += async (_, _) => await UseMyLocation();
+        MapBtn.Click += (_, _) => _ = new MapWindow(
+            _current?.Location ?? _location,
+            _current is not null ? Temp(_current.Reading.TempC) : "--",
+            _current?.Reading.Visual.Emoji ?? "").ShowDialog(this);
         RefreshBtn.Click += async (_, _) => await Refresh();
         UnitBtn.Click += (_, _) => ToggleUnit();
         Scene.PointerPressed += (_, e) => { var p = e.GetPosition(Scene); Scene.Spawn(p.X, p.Y); };
