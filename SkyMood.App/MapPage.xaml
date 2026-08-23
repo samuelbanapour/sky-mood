@@ -1,25 +1,80 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
              x:Class="SkyMood.App.MapPage"
              BackgroundColor="#0A1428">
 
     <!--
-        Embeds the web edition's satellite/weather map (Leaflet layers, legend, scrubber) via a
-        WebView rather than reimplementing it natively — that map is actively maintained on the
-        web side, so this stays current automatically instead of becoming a second copy to keep
-        in sync. The page opens straight to the map (?openMap=1) for the app's current location.
+        Native satellite/weather map (Mapsui — free, open-source, no API key) mirroring the web
+        edition's map: Satellite/Standard basemap toggle, a Precipitation/Temperature/Wind/Air
+        Quality layer picker, a legend, and a past/future scrubber. Same free data sources as the
+        web version (Esri/CARTO tiles, RainViewer radar, Open-Meteo forecast grid).
     -->
     <Grid>
-        <WebView x:Name="Map" />
+        <mapsui:MapControl x:Name="Map" />
 
-        <!-- The web page has its own map-close button, but that only hides its map overlay and
-             reveals the redundant full weather UI underneath — this native close reliably exits
-             the whole screen regardless of what state the web page is in. Placed top-right so it
-             doesn't visually stack with the web map's own top-left close button. -->
-        <Button x:Name="CloseBtn" Text="✕" HorizontalOptions="End" VerticalOptions="Start"
-                Margin="0,44,14,0" WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
-                BackgroundColor="White" TextColor="#111111" />
+        <!-- top bar -->
+        <Grid Margin="14,44,14,0" VerticalOptions="Start" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <VerticalStackLayout Grid.Column="0" Spacing="8">
+                <Button x:Name="CloseBtn" Text="✕" WidthRequest="38" HeightRequest="38" Padding="0"
+                        CornerRadius="19" BackgroundColor="White" TextColor="#111111" />
+                <HorizontalStackLayout BackgroundColor="#BF0A1428" Padding="3">
+                    <Button x:Name="SatBtn" Text="Satellite" FontSize="12" CornerRadius="17" Padding="12,6"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}" />
+                    <Button x:Name="StdBtn" Text="Standard" FontSize="12" CornerRadius="17" Padding="12,6"
+                            BackgroundColor="Transparent" TextColor="{StaticResource Ink}" Opacity="0.7" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <Grid Grid.Column="2" HorizontalOptions="End">
+                <Button x:Name="LayerBtn" Text="Precipitation" FontSize="13" CornerRadius="20" Padding="14,8"
+                        BackgroundColor="#BF0A1428" TextColor="{StaticResource Ink}" />
+                <Border x:Name="LayerMenu" IsVisible="False" VerticalOptions="Start" Margin="0,46,0,0"
+                        StrokeShape="RoundRectangle 16" Stroke="{StaticResource GlassEdge}"
+                        BackgroundColor="#F5101C30" Padding="6" WidthRequest="200">
+                    <VerticalStackLayout x:Name="LayerMenuItems" Spacing="2" />
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- legend -->
+        <Border x:Name="Legend" VerticalOptions="End" HorizontalOptions="Start" Margin="14,0,0,96"
+                StrokeShape="RoundRectangle 14" Stroke="{StaticResource GlassEdge}"
+                BackgroundColor="#CC0A1428" Padding="12,10">
+            <VerticalStackLayout Spacing="8">
+                <Label x:Name="LegendTitle" Text="Precipitation" FontSize="12" FontAttributes="Bold"
+                       TextColor="{StaticResource Ink}" />
+                <HorizontalStackLayout Spacing="8">
+                    <BoxView x:Name="LegendGrad" WidthRequest="6" HeightRequest="72" />
+                    <VerticalStackLayout x:Name="LegendLabels" Spacing="2" />
+                </HorizontalStackLayout>
+                <Label x:Name="LegendNote" IsVisible="False" FontSize="11" TextColor="{StaticResource InkSoft}"
+                       WidthRequest="180" LineBreakMode="WordWrap" />
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- scrubber -->
+        <Border VerticalOptions="End" Margin="14,0,14,14" StrokeShape="RoundRectangle 18"
+                Stroke="{StaticResource GlassEdge}" BackgroundColor="#D90A1428" Padding="12,10">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <Button Grid.Column="0" x:Name="PlayBtn" Text="▶" WidthRequest="34" HeightRequest="34"
+                        Padding="0" CornerRadius="17" BackgroundColor="{StaticResource Glass}"
+                        TextColor="{StaticResource Ink}" />
+                <VerticalStackLayout Grid.Column="1">
+                    <Label x:Name="ScrubWhen" Text="—" FontSize="12" FontAttributes="Bold"
+                           TextColor="{StaticResource Ink}" />
+                    <Slider x:Name="ScrubSlider" Minimum="0" Maximum="1" Margin="0,2,0,0" />
+                    <Grid x:Name="ScrubTicks" ColumnDefinitions="*,*,*" Margin="4,0">
+                        <Label Grid.Column="0" x:Name="TickStart" FontSize="9" TextColor="{StaticResource InkSoft}" />
+                        <Label Grid.Column="1" x:Name="TickNow" FontSize="9" TextColor="{StaticResource InkSoft}"
+                               HorizontalOptions="Center" Text="Now" />
+                        <Label Grid.Column="2" x:Name="TickEnd" FontSize="9" TextColor="{StaticResource InkSoft}"
+                               HorizontalOptions="End" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
     </Grid>
 
 </ContentPage>
