@@ -88,7 +88,12 @@ stages:
             displayName: Install maui-android workload
 
           - bash: |
-              if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+              # A pipeline variable that's never been created anywhere leaves the literal
+              # "$(Name)" text in an env: mapping rather than an empty string (see the iOS job's
+              # Import step for how this actually broke a build) — is_set() catches both that
+              # and genuine emptiness, so removing this secret later degrades safely too.
+              is_set() { case "$1" in ''|'$('*) return 1 ;; *) return 0 ;; esac; }
+              if is_set "$ANDROID_KEYSTORE_BASE64"; then
                 echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$AGENT_TEMPDIRECTORY/upload.keystore"
                 echo "##vso[task.setvariable variable=signed]true"
               else
@@ -165,6 +170,10 @@ stages:
             displayName: Stamp a real, unique package version into the appx manifest
 
           - bash: |
+              # See the iOS job's Import step for why is_set() (not a bare -n check) matters —
+              # a pipeline variable that's never been created leaves the literal "$(Name)" text
+              # in an env: mapping rather than an empty string.
+              is_set() { case "$1" in ''|'$('*) return 1 ;; *) return 0 ;; esac; }
               build_msix() {
                 local rid="$1"
                 local common=(-c Release -p:Heads=windows -f net10.0-windows10.0.19041.0 \
@@ -175,7 +184,7 @@ stages:
                         -p:AppxPackageDir=msix-$rid/ \
                         -p:ApplicationDisplayVersion=$(displayVersion) \
                         -p:ApplicationVersion=$(buildNum))
-                if [ -n "$WINDOWS_PFX_BASE64" ]; then
+                if is_set "$WINDOWS_PFX_BASE64"; then
                   echo "$WINDOWS_PFX_BASE64" | base64 -d > "$BUILD_SOURCESDIRECTORY/cert.pfx"
                   dotnet publish "$APP" "${common[@]}" \
                     -p:AppxPackageSigningEnabled=true \
@@ -229,8 +238,16 @@ stages:
           # runs the import when all four secrets are present; otherwise falls through to the
           # existing unsigned compile-check path so the job still degrades gracefully.
           - bash: |
-              if [ -n "$IOS_DIST_CERT_P12_BASE64" ] && [ -n "$IOS_PROVISIONING_PROFILE_BASE64" ] && \
-                 [ -n "$IOS_SIGNING_IDENTITY" ] && [ -n "$IOS_PROVISIONING_PROFILE_NAME" ]; then
+              # A pipeline variable that was never created anywhere (no default, no variable
+              # group entry) still gets an env: mapping here, but Azure Pipelines can't expand
+              # $(Name) for something that plain doesn't exist — it passes through the LITERAL
+              # unexpanded text "$(Name)" as the value instead of an empty string. A bare
+              # [ -n "$VAR" ] check can't tell that apart from a real value, so it wrongly took
+              # the signed branch with garbage secrets. is_set() rejects both empty AND
+              # still-literally-a-macro values.
+              is_set() { case "$1" in ''|'$('*) return 1 ;; *) return 0 ;; esac; }
+              if is_set "$IOS_DIST_CERT_P12_BASE64" && is_set "$IOS_PROVISIONING_PROFILE_BASE64" && \
+                 is_set "$IOS_SIGNING_IDENTITY" && is_set "$IOS_PROVISIONING_PROFILE_NAME"; then
                 KEYCHAIN_PATH="$AGENT_TEMPDIRECTORY/ios-signing.keychain-db"
                 KEYCHAIN_PASSWORD=$(uuidgen)
                 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -288,11 +305,12 @@ stages:
             env:
               SIGNED: $(signed)
               # Named SKYMOOD_* rather than IOS_SIGNING_IDENTITY/IOS_PROVISIONING_PROFILE_NAME —
-              # .NET-for-iOS's own SDK targets read an env var literally named
-              # IOS_SIGNING_IDENTITY as a signing trigger independent of -p:CodesignKey, so merely
-              # exporting it (even empty, even in the unsigned branch that never references it)
-              # made a plain unsigned compile-check build fail with "code signing key
-              # '$(IOS_SIGNING_IDENTITY)' not found in keychain". Renaming avoids the collision.
+              # .NET-for-iOS's SDK independently reads an env var literally named
+              # IOS_SIGNING_IDENTITY, so a stray/incorrect value there could confuse codesigning
+              # in ways unrelated to -p:CodesignKey. The real bug that broke the unsigned build
+              # was upstream (the is_set() check above) — SIGNED was wrongly "true" with no real
+              # secrets configured, so this branch ran with garbage values at all. Keeping the
+              # rename anyway as cheap insurance against that unrelated collision.
               SKYMOOD_CODESIGN_KEY: $(IOS_SIGNING_IDENTITY)
               SKYMOOD_CODESIGN_PROVISION: $(IOS_PROVISIONING_PROFILE_NAME)
               KEYCHAIN_PATH: $(keychainPath)
@@ -305,7 +323,10 @@ stages:
               if [ "$SIGNED" != "true" ]; then
                 echo "Not signed — skipping TestFlight upload."; exit 0
               fi
-              if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_API_KEY_P8_BASE64" ]; then
+              # See the is_set() comment in the Import step — a never-created pipeline variable
+              # leaves the literal "$(Name)" text here rather than an empty string.
+              is_set() { case "$1" in ''|'$('*) return 1 ;; *) return 0 ;; esac; }
+              if ! is_set "$ASC_KEY_ID" || ! is_set "$ASC_ISSUER_ID" || ! is_set "$ASC_API_KEY_P8_BASE64"; then
                 echo "Signed .ipa built, but no ASC_KEY_ID/ASC_ISSUER_ID/ASC_API_KEY_P8_BASE64 — skipping TestFlight upload."
                 exit 0
               fi
