@@ -77,7 +77,11 @@
     <!-- Native map control for the satellite/weather map (replaces the earlier WebView
          approach) — free/open-source, no API key, supports arbitrary XYZ tile URLs the same
          way Leaflet does, so the same Esri/CARTO/RainViewer tile sources work unchanged. -->
-    <PackageReference Include="Mapsui.UI.Maui" Version="5.1.0" />
+    <!-- Package id is "Mapsui.Maui" — "Mapsui.UI.Maui" is only the internal source-repo project
+         name; that id is unlisted on NuGet (confirmed: dotnet restore NU1101, and the search API
+         returns zero hits for it) and restore fails. The namespace inside the package is still
+         Mapsui.UI.Maui, unchanged — only this Include value needed fixing. -->
+    <PackageReference Include="Mapsui.Maui" Version="5.1.0" />
     <PackageReference Include="Mapsui.Nts" Version="5.1.0" />
   </ItemGroup>
 
