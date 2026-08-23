@@ -156,7 +156,9 @@ public partial class MapWindow : Window
     {
         if (_pinLayer is null) return;
         var (x, y) = SphericalMercator.FromLonLat(_loc.Longitude, _loc.Latitude);
-        string text = $"{_tempDisplay} {_emoji}" + (aqiSuffix is not null ? $"\n{aqiSuffix}" : "");
+        // No emoji here: Mapsui's Skia label renderer has no color-emoji glyph support and
+        // draws an unsupported character as a garbled tofu box instead of the weather icon.
+        string text = _tempDisplay + (aqiSuffix is not null ? $"\n{aqiSuffix}" : "");
         var feature = new GeometryFeature { Geometry = new NtsPoint(x, y) };
         feature.Styles.Add(new LabelStyle
         {
@@ -364,7 +366,10 @@ public partial class MapWindow : Window
 
         if (frame is RadarFrame radar)
         {
-            _overlayLayer = new TileLayer(new HttpTileSource(new GlobalSphericalMercator(),
+            // RainViewer's radar tiles only exist natively up to z=7 — capping the schema here
+            // makes BruTile upscale that tile at closer map zooms instead of requesting a
+            // nonexistent level and rendering the server's "Zoom Level Not Supported" tile.
+            _overlayLayer = new TileLayer(new HttpTileSource(new GlobalSphericalMercator(0, 7),
                 $"{radar.Host}{radar.Path}/256/{{z}}/{{x}}/{{y}}/2/1_1.png",
                 name: "Radar", attribution: new BruTile.Attribution("Radar © RainViewer"),
                 configureHttpRequestMessage: r => r.Headers.TryAddWithoutValidation("User-Agent", UserAgent)))
@@ -374,22 +379,33 @@ public partial class MapWindow : Window
         else if (frame is HeatFrame heat)
         {
             var def = Layers.First(l => l.Key == _layerKey).Def;
-            var features = new List<IFeature>(heat.Points.Length);
+            // Spacing between adjacent grid samples, in map units — sizes each point's blob so
+            // neighboring points overlap into a continuous wash instead of a hard-edged lattice
+            // of same-size circles (fixed-pixel SymbolStyle circles produced exactly that).
+            double spacing = Map.Map.Navigator.Viewport.ToExtent()!.Width / GridN;
+            var features = new List<IFeature>(heat.Points.Length * 3);
             foreach (var (lat, lon, value) in heat.Points)
             {
                 if (value is null) continue;
                 double t = Math.Clamp((value.Value - def.HeatMin) / (def.HeatMax - def.HeatMin), 0, 1);
                 var (r, g, b) = LerpGradient(def.GradientLowToHigh, t);
                 var (x, y) = SphericalMercator.FromLonLat(lon, lat);
-                var f = new GeometryFeature { Geometry = new NtsPoint(x, y) };
-                f.Styles.Add(new SymbolStyle
+                var center = new NtsPoint(x, y);
+                // Three concentric, decreasingly-opaque rings approximate a soft blurred blob
+                // (Mapsui has no built-in blur for vector fills), so overlapping points blend
+                // into each other instead of showing hard circle edges.
+                foreach (var (radiusMul, opacity) in new (double Mul, float Opacity)[]
+                         { (1.3, 0.14f), (0.85, 0.24f), (0.45, 0.4f) })
                 {
-                    SymbolType = SymbolType.Ellipse,
-                    SymbolScale = 6.5,
-                    Fill = new MsBrush(new MsColor(r, g, b)),
-                    Opacity = (float)(0.15 + t * 0.45),
-                });
-                features.Add(f);
+                    var f = new GeometryFeature { Geometry = center.Buffer(spacing * radiusMul) };
+                    f.Styles.Add(new VectorStyle
+                    {
+                        Fill = new MsBrush(new MsColor(r, g, b)),
+                        Outline = null,
+                        Opacity = opacity,
+                    });
+                    features.Add(f);
+                }
             }
             var heatLayer = new MemoryLayer { Name = "Overlay", Features = features };
             Map.Map.Layers.Insert(Map.Map.Layers.Count - 1, heatLayer); // stay under the pin
