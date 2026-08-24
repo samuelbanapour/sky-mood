@@ -12,6 +12,14 @@ form, without the express prior written permission of Solo Apps Studio.
 Unauthorized copying, distribution, modification, public display, or use of the
 Software, via any medium, is strictly prohibited.
 
+This prohibition extends beyond literal copying of source code: no person or
+entity may use the Software, or knowledge gained from viewing it, as the basis
+for creating, developing, or distributing a derivative work, competing product,
+or substantially similar application — including one that reproduces its
+features, design, user experience, or functionality by independent
+reimplementation. Viewing this repository's public source code does not grant
+any right to build a similar app.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
 FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
