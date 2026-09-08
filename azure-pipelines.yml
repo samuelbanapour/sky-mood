@@ -409,14 +409,16 @@ stages:
         condition: and(succeeded(), or(eq(variables.isTagPush, 'True'), eq('${{ parameters.syncMirror }}', 'True')))
         pool: { vmImage: ubuntu-latest }
         steps:
+          # A single download step with multi-line patterns — four separate `download: current`
+          # steps here (one per artifact, no explicit `name:` on any of them) silently collided:
+          # only one of the four ever actually fetched anything, so every `cp` below failed with
+          # "No such file or directory" and the whole job errored on the final `mirror/*` glob.
           - download: current
-            patterns: 'skymood-android-apk/**'
-          - download: current
-            patterns: 'skymood-macos-dmg/**'
-          - download: current
-            patterns: 'skymood-windows-msix/**'
-          - download: current
-            patterns: 'skymood-desktop-gui/**'
+            patterns: |
+              skymood-android-apk/**
+              skymood-macos-dmg/**
+              skymood-windows-msix/**
+              skymood-desktop-gui/**
           - bash: |
               mkdir -p mirror
               cp "$(Pipeline.Workspace)"/skymood-android-apk/*.apk mirror/SkyMood-android.apk
