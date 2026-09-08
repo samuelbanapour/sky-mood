@@ -48,6 +48,7 @@ public partial class MainPage : ContentPage
             _current?.Reading.Visual.Emoji ?? ""));
         RefreshBtn.Clicked += async (_, _) => await RefreshAsync();
         UnitBtn.Clicked += (_, _) => ToggleUnit();
+        AboutBtn.Clicked += async (_, _) => await Navigation.PushModalAsync(new AboutPage());
         ResultsList.SelectionChanged += OnResultSelected;
         PlacesList.SelectionChanged += OnPlaceSelected;
 

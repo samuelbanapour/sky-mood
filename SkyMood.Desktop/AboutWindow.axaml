@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SkyMood.Desktop.AboutWindow"
+        Title="About Sky Mood" Width="360" Height="420" MinWidth="320" MinHeight="360"
+        Icon="/Assets/skymood.ico" Background="#0A1428"
+        WindowStartupLocation="CenterOwner" CanResize="False">
+
+    <!--
+        Minimal About/Settings screen: app identity + version, and a Discord link. Colors are
+        hardcoded to match MainWindow/MapWindow's Glass/GlassEdge/Ink/InkSoft values
+        (#33121A2E/#44FFFFFF/#FFFFFFFF/#CCDCE6F5) since this project styles directly rather than
+        through a named resource dictionary.
+    -->
+    <Grid Margin="24" RowDefinitions="Auto,*">
+
+        <Button Grid.Row="0" Name="CloseBtn" Content="✕" Width="34" Height="34" Padding="0"
+                CornerRadius="17" Background="White" Foreground="#111111"
+                HorizontalAlignment="Right" />
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+            <TextBlock Text="🌤️" FontSize="52" HorizontalAlignment="Center" Margin="0,0,0,4" />
+            <TextBlock Text="Sky Mood" FontSize="26" FontWeight="Bold" Foreground="White"
+                       HorizontalAlignment="Center" />
+            <TextBlock Name="VersionText" Text="Version —" FontSize="13" Foreground="#CCDCE6F5"
+                       HorizontalAlignment="Center" Margin="0,0,0,10" />
+
+            <Border CornerRadius="16" BorderBrush="#44FFFFFF" BorderThickness="1"
+                    Background="#33121A2E" Padding="18,14">
+                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <Button Name="DiscordBtn" Content="Join our Discord" FontSize="15" FontWeight="Bold"
+                            Foreground="White" Background="Transparent" BorderThickness="0"
+                            HorizontalAlignment="Center" Padding="0" Cursor="Hand" />
+                    <TextBlock Text="discord.gg/VyVWy9kmj9" FontSize="12" Foreground="#CCDCE6F5"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Made by Solo Apps Studio" FontSize="11" Foreground="#CCDCE6F5" Opacity="0.8"
+                       HorizontalAlignment="Center" Margin="0,18,0,0" />
+        </StackPanel>
+    </Grid>
+</Window>

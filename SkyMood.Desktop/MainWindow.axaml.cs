@@ -54,6 +54,7 @@ public partial class MainWindow : Window
             _current?.Reading.Visual.Emoji ?? "").ShowDialog(this);
         RefreshBtn.Click += async (_, _) => await Refresh();
         UnitBtn.Click += (_, _) => ToggleUnit();
+        AboutBtn.Click += (_, _) => _ = new AboutWindow().ShowDialog(this);
         Scene.PointerPressed += (_, e) => { var p = e.GetPosition(Scene); Scene.Spawn(p.X, p.Y); };
         PointerMoved += (_, e) => { var p = e.GetPosition(this); Scene.SetTargetParallax(p.X / Math.Max(1, Bounds.Width) - 0.5, p.Y / Math.Max(1, Bounds.Height) - 0.5); };
 

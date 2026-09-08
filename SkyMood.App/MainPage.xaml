@@ -180,6 +180,9 @@
                     <Button x:Name="UnitBtn" Text="°C" CornerRadius="20"
                             BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}"
                             WidthRequest="56" Padding="0" />
+                    <Button x:Name="AboutBtn" Text="ⓘ" CornerRadius="20"
+                            BackgroundColor="{StaticResource Glass}" TextColor="{StaticResource Ink}"
+                            WidthRequest="46" Padding="0" />
                 </HorizontalStackLayout>
 
             </VerticalStackLayout>

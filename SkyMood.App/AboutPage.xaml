@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SkyMood.App.AboutPage"
+             BackgroundColor="#0A1428">
+
+    <!-- Minimal About/Settings screen: app identity + version, and a Discord link.
+         Styled to match MainPage/MapPage (same Glass/GlassEdge/Ink/InkSoft palette). -->
+    <Grid>
+        <Grid Margin="14,44,14,0" VerticalOptions="Start" HorizontalOptions="Start">
+            <Button x:Name="CloseBtn" Text="✕" WidthRequest="38" HeightRequest="38" Padding="0"
+                    CornerRadius="19" BackgroundColor="White" TextColor="#111111" />
+        </Grid>
+
+        <VerticalStackLayout Padding="24" Spacing="10" VerticalOptions="Center" HorizontalOptions="Center"
+                              MaximumWidthRequest="420">
+
+            <Label Text="🌤️" FontSize="56" HorizontalOptions="Center" Margin="0,0,0,4" />
+            <Label Text="Sky Mood" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Ink}"
+                   HorizontalOptions="Center" />
+            <Label x:Name="VersionLabel" Text="Version —" FontSize="14" TextColor="{StaticResource InkSoft}"
+                   HorizontalOptions="Center" Margin="0,0,0,10" />
+
+            <Border StrokeShape="RoundRectangle 16" Stroke="{StaticResource GlassEdge}"
+                    BackgroundColor="{StaticResource Glass}" Padding="18,14">
+                <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                    <Label Text="Join our Discord" FontSize="16" FontAttributes="Bold"
+                           TextColor="{StaticResource Ink}" HorizontalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnDiscordTapped" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <Label Text="discord.gg/VyVWy9kmj9" FontSize="13" TextColor="{StaticResource InkSoft}"
+                           HorizontalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnDiscordTapped" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="Made by Solo Apps Studio" FontSize="12" TextColor="{StaticResource InkSoft}"
+                   HorizontalOptions="Center" Margin="0,18,0,0" Opacity="0.8" />
+        </VerticalStackLayout>
+    </Grid>
+
+</ContentPage>
