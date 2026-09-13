@@ -1,0 +1,58 @@
+# Scoped to web/ only, and to this file's own directory for the trigger
+# path (Azure Pipelines paths in a multi-app repo are relative to the repo
+# root) - the rest of this repo is the unrelated .NET MAUI native app.
+trigger:
+  branches:
+    include: [main]
+  paths:
+    include:
+      - web/index.html
+      - web/privacy.html
+      - web/sitemap.xml
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - script: |
+      python3 - <<'PYEOF'
+      import json
+      import re
+      import sys
+      import urllib.error
+      import urllib.request
+
+      HOST = "sky-mood-web.vercel.app"
+      KEY = "6a0d5797873535cf727528b23213469d"
+      KEY_LOCATION = f"https://{HOST}/{KEY}.txt"
+
+      with open("web/sitemap.xml", encoding="utf-8") as f:
+          xml = f.read()
+      urls = re.findall(r"<loc>([^<]+)</loc>", xml)
+      if not urls:
+          sys.exit("no URLs found in web/sitemap.xml")
+
+      body = json.dumps({
+          "host": HOST,
+          "key": KEY,
+          "keyLocation": KEY_LOCATION,
+          "urlList": urls,
+      }).encode("utf-8")
+
+      print("submitting:", body.decode())
+      req = urllib.request.Request(
+          "https://api.indexnow.org/indexnow",
+          data=body,
+          headers={"Content-Type": "application/json; charset=utf-8"},
+          method="POST",
+      )
+      try:
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              print("HTTP", resp.status)
+      except urllib.error.HTTPError as e:
+          print("HTTP", e.code)
+          print(e.read().decode(errors="replace"))
+          if e.code not in (200, 202):
+              raise
+      PYEOF
+    displayName: "Submit sitemap URLs to IndexNow"

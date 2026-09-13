@@ -1,0 +1,10 @@
+# Sky Mood
+
+> A live weather widget: see your local weather come alive — animated, real-time, and works offline. This is the free web edition of the Sky Mood app, no install or account required.
+
+Sky Mood shows current conditions and a short forecast using open weather data (Open-Meteo), with an animated sky visualization and a map (Leaflet) for picking or confirming a location. It works from either browser geolocation or a manual location search, and continues to show the last-known conditions offline.
+
+## Pages
+
+- [Sky Mood](https://sky-mood-web.vercel.app/): the main weather app — single page, no login.
+- [Privacy Policy](https://sky-mood-web.vercel.app/privacy.html): what data the app uses (location, cached weather) and what it doesn't collect.
