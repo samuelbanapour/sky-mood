@@ -119,8 +119,13 @@ jobs:
           # toolchain doesn't resolve — "actool not found"). Functionally validate each candidate,
           # newest patch first, and keep the first whose toolchain actually works.
           xc=""
-          for cand in $(ls -d /Applications/Xcode_${need}*.app 2>/dev/null | grep -viE 'beta|candidate|_rc' | sort -Vr); do
-            if DEVELOPER_DIR="$cand/Contents/Developer" xcrun --sdk macosx --find actool >/dev/null 2>&1; then
+          for c in $(ls -d /Applications/Xcode_${need}*.app 2>/dev/null | grep -viE 'beta|candidate|_rc' | sort -Vr); do
+            # Resolve symlinked copies (Xcode_26.3.0.app -> real install) and require the actual SDK
+            # folders: some copies pass the actool lookup but lack MacOSX.sdk, which breaks the build.
+            cand=$(cd "$c" && pwd -P)
+            plat="$cand/Contents/Developer/Platforms"
+            if [ -d "$plat/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ] && [ -d "$plat/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk" ] \
+               && DEVELOPER_DIR="$cand/Contents/Developer" xcrun --sdk macosx --find actool >/dev/null 2>&1; then
               xc="$cand"; echo "  OK  $cand (working toolchain)"; break
             else
               echo "  bad $cand (incomplete — actool unresolved)"
