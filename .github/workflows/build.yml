@@ -90,7 +90,7 @@ jobs:
       - name: Ensure Apple workloads (pinned until the runner has Xcode 26.5)
         # TEMPORARY PIN (2026-11-22): the macos-15 image now ships the .NET-for-iOS 26.5 workload,
         # but the image only has Xcode up to 26.3, and Microsoft released no workload for 26.3.
-        # Until GitHub adds Xcode 26.5, roll iOS/MacCatalyst back to 26.2.10233 (needs Xcode 26.2,
+        # Until GitHub adds Xcode 26.5, roll iOS/MacCatalyst back to 26.2.10233 (needs Xcode 26.3,
         # which the image has). Once Xcode_26.5 appears on the runner this skips itself and uses
         # the image's own (newest) workload. Remove this block when 26.5 is standard.
         run: |
@@ -103,7 +103,7 @@ jobs:
             printf '{\n  "microsoft.net.sdk.ios": "26.2.10233/10.0.100",\n  "microsoft.net.sdk.maccatalyst": "26.2.10233/10.0.100"\n}\n' > "$RUNNER_TEMP/ios-pin.json"
             cat "$RUNNER_TEMP/ios-pin.json"
             dotnet workload install maui-ios maui-maccatalyst --from-rollback-file "$RUNNER_TEMP/ios-pin.json"
-            echo "IOS_XCODE_PIN=26.2" >> "$GITHUB_ENV"
+            echo "IOS_XCODE_PIN=26.3" >> "$GITHUB_ENV"   # 26.2.10233 packs require Xcode 26.3 (verified by build error)
           fi
           dotnet workload list
       - name: Select the Xcode the installed iOS workload requires
