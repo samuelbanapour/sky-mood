@@ -72,6 +72,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.1xx'
+      - name: Use the .NET 10 SDK for this job
+        # Installing .NET 10 isn't enough: `dotnet` picks the newest SDK on the machine (11.x) unless
+        # a global.json says otherwise. Written on the runner only (not committed to the repo).
+        run: |
+          v=$(dotnet --list-sdks | awk '{print $1}' | grep -E '^10\.0\.1[0-9]{2}$' | sort -V | tail -1)
+          echo "Pinning SDK $v"
+          printf '{ "sdk": { "version": "%s", "rollForward": "latestPatch" } }\n' "$v" > global.json
+          dotnet --version
       # NOTE (older): this job used to rely on the image's preinstalled .NET with NO setup-dotnet. The image's preinstalled .NET and its
       # bundled MAUI workload manifests are matched to the image's Xcode. setup-dotnet would pull
       # the newest manifest (.NET-for-iOS 26.5), which needs an Xcode this image doesn't carry.
