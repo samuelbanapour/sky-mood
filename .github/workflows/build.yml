@@ -73,16 +73,33 @@ jobs:
         run: |
           dotnet --version
           dotnet workload list || true
-      - name: Ensure Apple workloads (pinned to the image's manifests)
-        # --skip-manifest-update keeps the SDK band's manifest (matched to the image's Xcode)
-        # instead of bumping to the latest .NET-for-iOS, which would re-introduce the mismatch.
-        run: dotnet workload install maui-ios maui-maccatalyst --skip-manifest-update
+      - name: Ensure Apple workloads (pinned until the runner has Xcode 26.5)
+        # TEMPORARY PIN (2026-11-22): the macos-15 image now ships the .NET-for-iOS 26.5 workload,
+        # but the image only has Xcode up to 26.3, and Microsoft released no workload for 26.3.
+        # Until GitHub adds Xcode 26.5, roll iOS/MacCatalyst back to 26.2.10233 (needs Xcode 26.2,
+        # which the image has). Once Xcode_26.5 appears on the runner this skips itself and uses
+        # the image's own (newest) workload. Remove this block when 26.5 is standard.
+        run: |
+          if ls -d /Applications/Xcode_26.5*.app >/dev/null 2>&1; then
+            echo "Xcode 26.5 present: using the image's workload (pin inactive)"
+            dotnet workload install maui-ios maui-maccatalyst --skip-manifest-update
+          else
+            echo "No Xcode 26.5 on runner: pinning iOS/MacCatalyst workload to 26.2.10233"
+            dotnet workload config --update-mode manifests || true
+            printf '{\n  "microsoft.net.sdk.ios": "26.2.10233/10.0.100",\n  "microsoft.net.sdk.maccatalyst": "26.2.10233/10.0.100"\n}\n' > "$RUNNER_TEMP/ios-pin.json"
+            cat "$RUNNER_TEMP/ios-pin.json"
+            dotnet workload install maui-ios maui-maccatalyst --from-rollback-file "$RUNNER_TEMP/ios-pin.json"
+            echo "IOS_XCODE_PIN=26.2" >> "$GITHUB_ENV"
+          fi
+          dotnet workload list
       - name: Select the Xcode the installed iOS workload requires
         # The installed .NET-for-iOS pack name encodes its required Xcode (…net10.0_<XX.Y>). Pick
         # that exact Xcode from the image so the version gate passes for both iOS and Mac Catalyst.
         run: |
           pack=$(ls -d "${DOTNET_ROOT:-$HOME/.dotnet}"/packs/Microsoft.iOS.Sdk.net10.0_* 2>/dev/null | sort -V | tail -1)
           need=$(basename "$pack" | sed -E 's/.*net10\.0_([0-9.]+)$/\1/')
+          # While the temporary pin is active, older and newer packs can sit side by side; use the pinned one.
+          if [ -n "${IOS_XCODE_PIN:-}" ]; then need="$IOS_XCODE_PIN"; fi
           echo "Installed iOS workload requires Xcode $need"
           # Some same-version Xcodes on the image are broken stubs (the SDK folder exists but the
           # toolchain doesn't resolve — "actool not found"). Functionally validate each candidate,
